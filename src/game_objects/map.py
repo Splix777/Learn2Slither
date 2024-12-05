@@ -71,6 +71,18 @@ class Map:
             self.config.ASCII.green_apple,
         ]
     
+    def is_green_apple(self, x: int, y: int) -> bool:
+        """
+        Check if a given position on the map is a green apple.
+        """
+        return self.map[y][x] == self.config.ASCII.green_apple
+    
+    def is_red_apple(self, x: int, y: int) -> bool:
+        """
+        Check if a given position on the map is a red apple.
+        """
+        return self.map[y][x] == self.config.ASCII.red_apple
+
     def is_wall(self, x: int, y: int) -> bool:
         """
         Check if a given position on the map is a wall.
@@ -88,6 +100,14 @@ class Map:
         for _ in range(self.green_apples):
             pos: dict[str, int] = self.get_random_empty_position(game_map)
             game_map[pos["y"]][pos["x"]] = self.config.ASCII.green_apple
+
+    # <-- Map Display Methods -->
+    def display_map(self):
+        """
+        Display the map in the console.
+        """
+        for row in self.map:
+            print("".join(row))
 
 
 if __name__ == "__main__":

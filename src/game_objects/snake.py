@@ -23,6 +23,7 @@ class Direction(Enum):
 class Snake:
     def __init__(self, config: Config, game_map: Map):
         self.config: Config = config
+        self.alive: bool = True
         self.map: Map = game_map
         self.head: Dict[str, int] = {}
         self.body: List[Dict[str, int]] = []
@@ -42,13 +43,13 @@ class Snake:
         self.map.map[self.head["y"]][self.head["x"]] = (
             self.config.ASCII.snake_head
         )
-        self.body.append(self.head)  # Add the head to the body list
+        self.body.append(self.head)
 
-        # Create the body parts based on the snake's size
         for _ in range(self.size - 1):
             self._add_body()
 
     def _add_body(self) -> None:
+        """Add a new body part behind the last segment."""
         last_part = self.body[-1]
         x, y = last_part["x"], last_part["y"]
 
@@ -60,42 +61,75 @@ class Snake:
                 self.map.map[new_y][new_x] = self.config.ASCII.snake_body
                 return
         raise ValueError("No empty spaces for the snake body.")
-    
+
     def is_body(self, x: int, y: int) -> bool:
         """
         Check if a given position on the map is a snake body part.
         """
         return self.map.map[y][x] == self.config.ASCII.snake_body
 
-    def _move(self, new_head: tuple[int, int]) -> None:
+    def move(self, new_head: tuple[int, int]) -> None:
         """
         Move the snake to the new position.
         """
         x, y = new_head
 
-        # Check if the new position is an apple
         if self.map.is_apple(x, y):
             self._eat_apple(x, y)
         elif self.map.is_wall(x, y):
-            self._die()
+            self.alive = False
         elif self.is_body(x, y):
-            self._die()
+            self.alive = False
         else:
             self._move_snake(x, y)
-            
 
+    def _eat_apple(self, x: int, y: int) -> None:
+        """
+        Eat an apple and grow the snake.
+        """
+        if self.map.is_green_apple(x, y):
+            self.size += 1
+            self.map.green_apples -= 1
+        elif self.map.is_red_apple(x, y):
+            self.size -= 1
+            self.map.red_apples -= 1
 
+        self.map.map[y][x] = self.config.ASCII.snake_head
+        self.head = {"x": x, "y": y}
 
+        self._add_body()
+
+    def _move_snake(self, x: int, y: int) -> None:
+        """
+        Move the snake to the new position.
+        The body follows the head.
+        """
+        # Move the body first (from tail to head)
+        for i in range(len(self.body) - 1, 0, -1):
+            self.body[i]["x"], self.body[i]["y"] = self.body[i - 1]["x"], self.body[i - 1]["y"]
+            self.map.map[self.body[i]["y"]][self.body[i]["x"]] = self.config.ASCII.snake_body
+
+        # Move the head to the new position
+        self.head = {"x": x, "y": y}
+        self.map.map[self.head["y"]][self.head["x"]] = self.config.ASCII.snake_head
+
+        # Clear the old body (where the snake used to be)
+        last_part = self.body[-1]
+        self.map.map[last_part["y"]][last_part["x"]] = self.config.ASCII.empty
+
+        # Update the body list to reflect the movement
+        self.body[0] = self.head
+        self.body = self.body[:-1]
 
 
 if __name__ == "__main__":
-    try:
-        config: Config = get_config()
-        game_map: Map = Map(config)
-        snake: Snake = Snake(config, game_map)
+    config: Config = get_config()
+    game_map: Map = Map(config)
+    snake: Snake = Snake(config, game_map)
 
-        for row in game_map.map:
-            print("".join(row))
+    game_map.display_map()
 
-    except Exception as e:
-        print(e)
+    snake.move(Direction.RIGHT.move(*snake.head.values()))
+
+    game_map.display_map()
+
