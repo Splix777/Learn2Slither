@@ -1,0 +1,84 @@
+project:
+  name: Learn2Slither
+  description: A snake that learns how to behave through trial and error.
+  version: "1.0.0"
+  author: Federico Salazar Lois
+  license: MIT
+  repository: ""
+  environment: Development
+
+logging:
+  level: info
+  file: learn2slither.log
+
+map:
+  board_size:
+    width: 10
+    height: 10
+  starting_green_apples: 2
+  starting_red_apples: 1
+
+snake:
+  start_color: blue
+  start_speed: 1
+  start_size: 3
+  start_vision: 4
+
+visual:
+  modes:
+    type:
+      - cli
+      - pygame
+    mode: cli
+    control:
+      - auto
+      - manual
+  speed: normal
+
+ASCII:
+  wall: W
+  snake_head: H
+  snake_body: S
+  green_apple: G
+  red_apple: R
+  empty: "0"
+
+rules:
+  collisions:
+    snake_collision:
+      action: death
+      consequence: -100
+      snake_effect: 0
+    wall_collision:
+      action: death
+      consequence: -100
+      snake_effect: 0
+    green_apple_collision:
+      action: grow
+      consequence: 10
+      snake_effect: 1
+    red_apple_collision:
+      action: shrink 
+      consequence: -10
+      snake_effect: -1
+  win_condition:
+    condition: max_snake_size
+    max_score: 10
+
+allowed_models:
+  q_functions:
+    - q-values
+    - q-table
+    - neural-network
+
+learning_parameters:
+  learning_rate: 0.1
+  discount_factor: 0.9
+  exploration_rate: 1.0
+  exploration_decay: 0.99
+  min_exploration_rate: 0.01
+
+paths:
+  models: ./models
+  logs: ./logs
+  outputs: ./outputs
