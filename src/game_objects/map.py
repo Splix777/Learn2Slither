@@ -11,15 +11,17 @@ class Map:
         self.width: int = config.map.board_size.width
         self.green_apples: int = config.map.starting_green_apples
         self.red_apples: int = config.map.starting_red_apples
+        self.current_green_apples: int = 0
+        self.current_red_apples: int = 0
         self.map: List[List[str]] = self.make_map()
 
     def make_map(self) -> List[List[str]]:
         """
         Create a map with the given configuration.
         """
-        map: List[List[str]] = self._create_blank_map()
-        self._add_walls(map)
-        return map
+        empty_map: List[List[str]] = self._create_blank_map()
+        self._add_walls(empty_map)
+        return empty_map
 
     def get_random_empty_position(self, game_map: List[List[str]]):
         """
@@ -94,15 +96,18 @@ class Map:
         """
         Add apples to random empty spaces on the map.
         """
-        for _ in range(self.red_apples):
-            pos: dict[str, int] = self.get_random_empty_position(game_map)
-            game_map[pos["y"]][pos["x"]] = self.config.ASCII.red_apple
-        for _ in range(self.green_apples):
-            pos: dict[str, int] = self.get_random_empty_position(game_map)
-            game_map[pos["y"]][pos["x"]] = self.config.ASCII.green_apple
+        while self.current_green_apples < self.green_apples:
+            x, y = self.get_random_empty_position(game_map).values()
+            game_map[y][x] = self.config.ASCII.green_apple
+            self.current_green_apples += 1
+
+        while self.current_red_apples < self.red_apples:
+            x, y = self.get_random_empty_position(game_map).values()
+            game_map[y][x] = self.config.ASCII.red_apple
+            self.current_red_apples += 1
 
     # <-- Map Display Methods -->
-    def display_map(self):
+    def display_map(self) -> None:
         """
         Display the map in the console.
         """

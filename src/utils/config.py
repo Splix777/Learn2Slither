@@ -63,7 +63,7 @@ class VisualConfig(BaseModel):
 
 class CollisionEffectsConfig(BaseModel):
     action: Literal["death", "grow", "shrink"]
-    consequence: int
+    reward: int
     snake_effect: int
 
 
