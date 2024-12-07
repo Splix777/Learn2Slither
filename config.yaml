@@ -1,6 +1,6 @@
 project:
   name: Learn2Slither
-  description: A snake that learns how to behave through trial and error.
+  description: A snake game with neural network-based AI and multiplayer modes.
   version: "1.0.0"
   author: Federico Salazar Lois
   license: MIT
@@ -13,35 +13,72 @@ logging:
 
 map:
   board_size:
-    width: 10
+    width: 40
     height: 10
-  starting_green_apples: 2
-  starting_red_apples: 1
+  green_apples: 2
+  red_apples: 1
+  snakes: 1
 
 snake:
   start_color: blue
   start_speed: 1
   start_size: 3
-  start_vision: 4
+  ai_vision: 4
+  player_colors:
+    - red
+    - yellow
+    - green
+  ai_colors:
+    - purple
+    - orange
+  max_speed: 5
 
 visual:
   modes:
-    type:
+    mode: cli
+    available_modes:
       - cli
       - pygame
-    mode: cli
     control:
       - auto
       - manual
+    multiplayer_modes:
+      - free_for_all
+      - team
   speed: normal
+  themes:
+    default_theme: dark
+    available_themes:
+      - light
+      - dark
 
-ASCII:
+ascii:
   wall: W
   snake_head: H
   snake_body: S
   green_apple: G
   red_apple: R
   empty: "0"
+
+pygame_textures:
+  wall:
+    dark: wall/wall_dark.png
+    light: wall/wall_light.png
+  snake_head:
+    dark: snake_head/snake_head_dark.png
+    light: snake_head/snake_head_light.png
+  snake_body:
+    dark: snake_body/snake_body_dark.png
+    light: snake_body/snake_body_light.png
+  green_apple:
+    dark: green_apple/green_apple_dark.png
+    light: green_apple/green_apple_light.png
+  red_apple:
+    dark: red_apple/red_apple_dark.png
+    light: red_apple/red_apple_light.png
+  empty:
+    dark: empty/empty_dark.png
+    light: empty/empty_light.png
 
 rules:
   collisions:
@@ -65,20 +102,29 @@ rules:
     condition: max_snake_size
     max_score: 10
 
-allowed_models:
-  q_functions:
-    - q-values
-    - q-table
-    - neural-network
-
-learning_parameters:
-  learning_rate: 0.1
-  discount_factor: 0.9
-  exploration_rate: 1.0
-  exploration_decay: 0.99
-  min_exploration_rate: 0.01
+neural_network:
+  architecture:
+    layers:
+      input_size: 16  # Based on snake vision
+      hidden: [32, 64, 32]  # Adjustable hidden layers
+      output_size: 4  # Directions: up, down, left, right
+    activation_function:
+      function: relu
+      output_function: softmax
+    optimizer: adam
+    loss_function: mse
+  training:
+    batch_size: 64
+    epochs: 50
+    learning_rate: 0.001
+    exploration:
+      initial_rate: 1.0
+      decay: 0.99
+      minimum_rate: 0.01
+    discount_factor: 0.9
 
 paths:
-  models: ./models
-  logs: ./logs
-  outputs: ./outputs
+  models: models
+  logs: logs
+  outputs: outputs
+  textures: resources/textures
