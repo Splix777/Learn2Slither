@@ -180,14 +180,14 @@ class GameManager:
 
         if self.board.check_collision(snake, self.board.snakes):
             done = True
-            reward = -10
+            reward = self.config.rules.collisions.wall_collision.reward
 
         elif self.board.map[snake.head[0]][snake.head[1]] == "green_apple":
-            reward = 10  # Positive reward for eating a green apple
+            reward = self.config.rules.collisions.green_apple_collision.reward
         elif self.board.map[snake.head[0]][snake.head[1]] == "red_apple":
-            reward = -5  # Negative reward for eating a red apple
+            reward = self.config.rules.collisions.red_apple_collision.reward
         elif snake.kills > 0:
-            reward = 15  # KILLER SNAKES! Nani?
+            reward = self.config.rules.collisions.snake_kill.reward # KILLER SNAKES! Nani?!
 
         next_state = self.get_snake_vision(snake)
         return next_state, reward, done

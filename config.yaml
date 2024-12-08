@@ -82,13 +82,13 @@ pygame_textures:
 
 rules:
   collisions:
-    snake_collision:
+    snake_kill:
       action: death
-      reward: -100
+      reward: 15
       snake_effect: 0
     wall_collision:
       action: death
-      reward: -100
+      reward: -10
       snake_effect: 0
     green_apple_collision:
       action: grow
@@ -96,7 +96,7 @@ rules:
       snake_effect: 1
     red_apple_collision:
       action: shrink 
-      reward: -10
+      reward: -5
       snake_effect: -1
   win_condition:
     condition: max_snake_size

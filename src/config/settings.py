@@ -125,7 +125,7 @@ class CollisionEffects(BaseModel):
 
 class Collisions(BaseModel):
     """Collisions configuration model."""
-    snake_collision: CollisionEffects
+    snake_kill: CollisionEffects
     wall_collision: CollisionEffects
     green_apple_collision: CollisionEffects
     red_apple_collision: CollisionEffects
