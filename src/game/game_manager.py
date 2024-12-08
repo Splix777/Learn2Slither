@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Optional
 
 import pygame
 
@@ -28,8 +28,13 @@ class GameManager:
         self.config: Config = config
         self.textures: GameTextures = textures
         self.board: GameBoard = GameBoard(config=config)
-        self.game_controllers: dict[int, Callable] = {}
         self.game_visuals: str = self.config.visual.modes.mode
+        self.game_controllers: dict[int, Callable] = {}
+        # <-- GUI Optionals -->
+        self.console: Optional[Console] = None
+        self.window: Optional[pygame.Surface] = None
+        self.render: Callable = lambda: None
+        # < -- Initialize -->
         self.initialize()
 
     def initialize(self) -> None:
@@ -154,44 +159,38 @@ class GameManager:
 
     def step(self, action: int) -> Tuple[List[int], float, bool]:
         """
-        Perform one step in the game based on the chosen action, then return the new state, reward, and done flag.
+        Perform one step in the game based on the chosen action,
+        then return the new state, reward, and done flag.
 
         Args:
-            action (int): The action chosen by the agent (0: up, 1: down, 2: left, 3: right).
+            action (int): The action chosen by the agent
+                (0: up, 1: down, 2: left, 3: right).
 
         Returns:
-            Tuple[List[int], float, bool]: The next state, the reward, and whether the game is done.
+            Tuple[List[int], float, bool]: The next state,
+                the reward, and whether the game is done.
         """
-        snake = self.snakes[0]  # Assuming the agent is controlling the first snake
-
-        # Get the current state (vision of the board)
-        state = self.get_snake_vision(snake)
-
-        # Apply the action
+        snake = self.board.snakes[0]
         snake.change_direction(action)
 
-        # Move the snake and update the game state
         self.update()
 
-        # Check for collisions and apply rewards
         done = False
         reward = 0
 
-        # Check if the snake collided with a wall or itself
-        if self.board.check_collision(snake, self.snakes):
+        if self.board.check_collision(snake, self.board.snakes):
             done = True
-            reward = -10  # Negative reward for hitting a wall or itself
+            reward = -10
 
-        # Check if the snake ate an apple
         elif self.board.map[snake.head[0]][snake.head[1]] == "green_apple":
             reward = 10  # Positive reward for eating a green apple
         elif self.board.map[snake.head[0]][snake.head[1]] == "red_apple":
-            reward = 5  # Positive reward for eating a red apple
+            reward = -5  # Negative reward for eating a red apple
+        elif snake.kills > 0:
+            reward = 15  # KILLER SNAKES! Nani?
 
-        # Return the next state, reward, and whether the game is done
         next_state = self.get_snake_vision(snake)
         return next_state, reward, done
-
 
 
 if __name__ == "__main__":
