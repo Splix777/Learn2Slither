@@ -195,23 +195,17 @@ class GameManager:
 
 
 if __name__ == "__main__":
+    import time
     fps = 6
 
     textures = GameTextures(config)
     game_manager = GameManager(config, textures)
     key_listener = KeyListener()
-    # while True:
-    # Human can only be p1
-    # if key := key_listener.get_key():
-    #     game_manager.game_controllers[0](key)
-    game_manager.update()
-    # time.sleep(1 / fps)
-
-    # print JSON representation of the snake vision
-    snake = game_manager.snakes[0]
-    vision = game_manager.get_snake_vision(snake)
-    # vision is a dict so lets pretty print it as JSON
-    import json
-
-    print(json.dumps(vision, indent=4))
-    print(game_manager.board.snake_vision)
+    while True:
+        if key := key_listener.get_key():
+            game_manager.game_controllers[0](int(key))
+        game_manager.update()
+        time.sleep(1 / fps)
+        if not any(snake.alive for snake in game_manager.board.snakes):
+            break
+    key_listener.listener.stop()

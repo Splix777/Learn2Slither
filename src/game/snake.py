@@ -58,17 +58,14 @@ class Snake:
         if not self.alive:
             return removed_tails
 
-        # Calculate new head position
         new_head = (
             self.head[0] + self.movement_direction.value[0],
             self.head[1] + self.movement_direction.value[1],
         )
 
-        # Update snake's body
         self.body.insert(0, new_head)
         self.head: Tuple[int, int] = new_head
 
-        # Add or remove tails to match the snake's size
         while len(self.body) > self.size:
             removed_tails.append(self.body.pop())
 
