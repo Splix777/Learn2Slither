@@ -1,7 +1,8 @@
+"""Game manager module."""
+
 import os
-import time
-from typing import List, Callable, Tuple
 from pathlib import Path
+from typing import List, Callable, Tuple
 
 import pygame
 
@@ -15,17 +16,22 @@ from src.ui.game_textures import GameTextures
 
 
 class GameManager:
-    def __init__(self, config: Config, textures: GameTextures):
+    def __init__(self, config: Config, textures: GameTextures) -> None:
+        """
+        Game manager class.
+
+        Args:
+            config (Config): The game configuration.
+            textures (GameTextures): The game textures.
+        """
         self.config: Config = config
         self.textures: GameTextures = textures
-        self.board: GameBoard = GameBoard(config, textures)
+        self.board: GameBoard = GameBoard(config=config)
         self.game_controllers: dict[int, Callable] = {}
-        self.snakes: List[Snake] = []
         self.initialize()
 
     def initialize(self) -> None:
-        self.snakes: List[Snake] = self.create_snakes()
-        for snake in self.snakes:
+        for snake in self.board.snakes:
             self.game_controllers[snake.id] = snake.change_direction
 
         self.game_visuals: str = self.config.visual.modes.mode
@@ -50,20 +56,6 @@ class GameManager:
                 )
             )
             self.render: Callable = self.pygame_mode()
-
-    def create_snakes(self) -> List[Snake]:
-        snakes: List[Snake] = []
-        for snake_num in range(self.config.map.snakes):
-            snake = Snake(
-                config=self.config,
-                textures=self.textures,
-                start_position=self.board.snake_starting_positions[snake_num],
-                id=snake_num,
-            )
-            snakes.append(snake)
-            self.board.update_snake_position(snake)
-
-        return snakes
 
     def update(self) -> None:
         self.board.add_apples()

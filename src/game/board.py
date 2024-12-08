@@ -2,33 +2,27 @@ import random
 from typing import List, Tuple
 from itertools import product
 
-from src.config.settings import Config, get_config
-from src.ui.game_textures import GameTextures
+from src.config.settings import Config
+from src.utils.starting_positions import StartingPositions
 from src.game.snake import Snake
 
 
 class GameBoard:
-    def __init__(self, config: Config, textures: GameTextures):
+    def __init__(self, config: Config):
         self.config: Config = config
-        # self.textures: GameTextures = textures
-        # self.console = Console()
+        # <-- Map Dimensions -->
         self.height: int = config.map.board_size.height
         self.width: int = config.map.board_size.width
-        # 4 cardinal directions not including head
-        self.snake_vision: int = (2 * self.height + 2 * self.width - 4) // 2
+        # <-- Apples -->
         self.green_apples: int = config.map.green_apples
         self.red_apples: int = config.map.red_apples
         self.current_green_apples: int = 0
         self.current_red_apples: int = 0
         # <-- Snakes -->
         self.num_snakes: int = config.map.snakes
-        # self.snakes: List[Snake] = []
-        self.snake_starting_positions = {
-            0: (6, 6),
-            1: (1, self.width - 4),
-            2: (self.height - 2, 3),
-            3: (self.height - 2, self.width - 4),
-        }
+        self.snake_vision: int = (2 * self.height + 2 * self.width - 4) // 2
+        self.snakes: List[Snake] = []
+        self.starting_positions = StartingPositions((self.height, self.width))
         # <-- Initialize Map -->
         self.map: List[List[str]] = self.make_map()
 
@@ -66,6 +60,24 @@ class GameBoard:
             ):
                 game_map[row][col] = "wall"
 
+    def create_snakes(self) -> List[Snake]:
+        """
+        Create snakes for the game.
+
+        Returns:
+            List[Snake]: A list of snakes.
+        """
+        snakes: List[Snake] = []
+        for snake_num in range(self.num_snakes):
+            snake = Snake(
+                id=snake_num,
+                size=self.config.snake.start_size,
+                start_position=self.starting_positions.positions[snake_num],
+            )
+            snakes.append(snake)
+            self.update_snake_position(snake=snake)
+        return snakes
+
     # <-- Utility methods -->
     def get_random_empty_coordinate(self) -> Tuple[int, int]:
         """
@@ -96,7 +108,7 @@ class GameBoard:
             self.map[y][x] = "red_apple"
             self.current_red_apples += 1
 
-    # <-- Create Snakes -->
+    # <-- Collisions -->
     def check_collision(self, snake: Snake, all_snakes: List[Snake]) -> bool:
         if self._collided_with_wall(snake):
             self._delete_snake(snake)
@@ -144,6 +156,7 @@ class GameBoard:
         for segment in range(1, len(snake.body)):
             self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
 
+    # <-- Game state update methods -->
     def check_apple_eaten(self, snake: Snake) -> None:
         if self.map[snake.head[0]][snake.head[1]] == "green_apple":
             self.current_green_apples -= 1
@@ -165,11 +178,3 @@ class GameBoard:
         empty_spaces: List[Tuple[int, int]] = snake.move()
         for space in empty_spaces:
             self.map[space[0]][space[1]] = "empty"
-
-
-if __name__ == "__main__":
-    config: Config = get_config()
-    textures: GameTextures = GameTextures(config)
-    board: GameBoard = GameBoard(config, textures)
-
-    board.add_apples()

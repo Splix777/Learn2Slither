@@ -1,11 +1,14 @@
+"""Settings module for the Snake game configuration."""
+
 import os
 from typing import List, Literal
-from pydantic import BaseModel, Field, ValidationError, model_validator
-from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
 from pathlib import Path
+from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic_yaml import parse_yaml_raw_as
 
 
 class ProjectConfig(BaseModel):
+    """Project configuration model."""
     name: str
     description: str
     version: str
@@ -16,11 +19,13 @@ class ProjectConfig(BaseModel):
 
 
 class LoggingConfig(BaseModel):
+    """Logging configuration model."""
     level: Literal["debug", "info", "warning", "error", "critical"]
     file: str
 
 
 class BoardSize(BaseModel):
+    """Board size configuration model."""
     width: int = Field(
         ge=10,
         le=100,
@@ -34,6 +39,7 @@ class BoardSize(BaseModel):
 
 
 class MapConfig(BaseModel):
+    """Map configuration model."""
     board_size: BoardSize
     green_apples: int = Field(
         gt=0, description="Starting green apples must be greater than 0"
@@ -49,6 +55,7 @@ class MapConfig(BaseModel):
 
 
 class SnakeConfig(BaseModel):
+    """Snake configuration model."""
     start_color: str
     start_speed: int
     start_size: int = Field(
@@ -63,6 +70,7 @@ class SnakeConfig(BaseModel):
 
 
 class VisualModes(BaseModel):
+    """Visual modes configuration model."""
     mode: Literal["cli", "pygame"]
     available_modes: List[Literal["cli", "pygame"]]
     control: List[Literal["auto", "manual"]]
@@ -70,17 +78,20 @@ class VisualModes(BaseModel):
 
 
 class ThemesConfig(BaseModel):
+    """Themes configuration model."""
     default_theme: Literal["dark", "light"]
     available_themes: List[Literal["light", "dark"]]
 
 
 class VisualConfig(BaseModel):
+    """Visual configuration model."""
     modes: VisualModes
     speed: Literal["slow", "normal", "fast"]
     themes: ThemesConfig
 
 
 class ASCIIConfig(BaseModel):
+    """ASCII configuration model."""
     wall: str
     snake_head: str
     snake_body: str
@@ -90,11 +101,13 @@ class ASCIIConfig(BaseModel):
 
 
 class ThemedTextures(BaseModel):
+    """Themed textures configuration model."""
     dark: Path
     light: Path
 
 
 class PyGameTextures(BaseModel):
+    """PyGame textures configuration model."""
     wall: ThemedTextures
     snake_head: ThemedTextures
     snake_body: ThemedTextures
@@ -104,12 +117,14 @@ class PyGameTextures(BaseModel):
 
 
 class CollisionEffects(BaseModel):
+    """Collision effects configuration model."""
     action: Literal["death", "grow", "shrink"]
     reward: int
     snake_effect: int
 
 
 class Collisions(BaseModel):
+    """Collisions configuration model."""
     snake_collision: CollisionEffects
     wall_collision: CollisionEffects
     green_apple_collision: CollisionEffects
@@ -117,6 +132,7 @@ class Collisions(BaseModel):
 
 
 class WinConditionsConfig(BaseModel):
+    """Win conditions configuration model."""
     condition: Literal["max_snake_size", "last_snake_alive"]
     max_score: int = Field(
         gt=0, description="Max score must be greater than 0"
@@ -124,22 +140,26 @@ class WinConditionsConfig(BaseModel):
 
 
 class RulesConfig(BaseModel):
+    """Rules configuration model."""
     collisions: Collisions
     win_condition: WinConditionsConfig
 
 
 class LayerConfig(BaseModel):
+    """Layer configuration model."""
     input_size: int
     hidden: List[int]
     output_size: int
 
 
 class ActivationConfig(BaseModel):
+    """Activation function configuration model."""
     function: Literal["relu", "lrelu", "tanh", "sigmoid", "softmax"]
     output_function: Literal["sigmoid", "softmax"]
 
 
 class ArchitectureConfig(BaseModel):
+    """Architecture configuration model."""
     layers: LayerConfig
     activation_function: ActivationConfig
     optimizer: Literal["adam", "sgd", "rmsprop"]
@@ -147,12 +167,14 @@ class ArchitectureConfig(BaseModel):
 
 
 class ExplorationConfig(BaseModel):
+    """Exploration configuration model."""
     initial_rate: float
     decay: float
     minimum_rate: float
 
 
 class TrainingConfig(BaseModel):
+    """Training configuration model."""
     batch_size: int
     epochs: int
     learning_rate: float
@@ -161,11 +183,13 @@ class TrainingConfig(BaseModel):
 
 
 class NeuralNetworkConfig(BaseModel):
+    """Neural network configuration model."""
     architecture: ArchitectureConfig
     training: TrainingConfig
 
 
 class PathsConfig(BaseModel):
+    """Paths configuration model."""
     models: Path
     logs: Path
     outputs: Path
@@ -173,6 +197,7 @@ class PathsConfig(BaseModel):
 
 
 class Config(BaseModel):
+    """Main configuration model."""
     project: ProjectConfig
     logging: LoggingConfig
     map: MapConfig
@@ -186,8 +211,10 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def check_map_config(self: "Config") -> "Config":
+        """Check if the map configuration is valid."""
         total_map_spaces: int = (
-            self.map.board_size.width * self.map.board_size.height
+            self.map.board_size.width
+            * self.map.board_size.height
         )
 
         walls: int = (
@@ -216,15 +243,14 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def strings_to_paths(self: "Config") -> "Config":
+        """Convert string paths to Path objects."""
         root_path: Path = Path(__file__).parent / "../../"
 
-        # Define paths
         self.paths.models = root_path / self.paths.models
         self.paths.logs = root_path / self.paths.logs
         self.paths.outputs = root_path / self.paths.outputs
         self.paths.textures = root_path / self.paths.textures
 
-        # Iterate over the texture attributes and set the paths
         for texture in vars(self.pygame_textures).values():
             if isinstance(texture, ThemedTextures):
                 texture.dark = self.paths.textures / texture.dark
@@ -234,7 +260,7 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def verify_textures_exist(self: "Config") -> "Config":
-        # Define the texture paths to check
+        """Verify that all texture files exist."""
         textures_to_check: List[tuple[str, list[str]]] = [
             ('wall', ['dark', 'light']),
             ('snake_head', ['dark', 'light']),
@@ -244,28 +270,26 @@ class Config(BaseModel):
             ('empty', ['dark', 'light']),
         ]
 
-        # Check if all texture files exist
         for texture_name, sub_textures in textures_to_check:
             texture = getattr(self.pygame_textures, texture_name)
             for sub_texture in sub_textures:
                 path = getattr(texture, sub_texture)
                 if not path.exists():
                     raise FileNotFoundError(f"Texture file not found: {path}")
-                
+
         return self
 
+
 def get_config() -> Config:
+    """Load the configuration from the config.yaml file."""
     relative_path = "../../config.yaml"
     config_path: str = os.path.join(Path(__file__).parent, relative_path)
 
     try:
-        # Load and parse YAML using pydantic-yaml
-        with open(config_path, "r") as f:
+        with open(file=config_path, mode="r", encoding="utf-8") as f:
             raw_config: str = f.read()
 
-        # Validate the configuration
-        config: Config = parse_yaml_raw_as(Config, raw_config)
-        return config
+        return parse_yaml_raw_as(model_type=Config, raw=raw_config)
 
     except ValidationError as e:
         print("Validation error occurred:", e)
@@ -275,10 +299,5 @@ def get_config() -> Config:
         raise ValidationError(f"Error loading configuration: {e}") from e
 
 
-if __name__ == "__main__":
-    try:
-        config: Config = get_config()
-        # print(config)
-        print(to_yaml_str(config))
-    except Exception as e:
-        print(e)
+# Singleton pattern
+config: Config = get_config()

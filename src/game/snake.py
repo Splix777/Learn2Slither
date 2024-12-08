@@ -1,31 +1,24 @@
 from typing import Tuple, List
 
 from src.utils.directions import Direction
-from src.config.settings import Config
-from src.ui.game_textures import GameTextures
 
 
 class Snake:
     def __init__(
         self,
-        config: Config,
-        textures: GameTextures,
-        start_position: Tuple[int, int],
         id: int,
+        size: int,
+        start_position: Tuple[int, int],
     ):
-        self.config = config
-        self.textures = textures
         self.id = id
-        # Snake index 0 and 2 start moving right, 1 and 3 start moving left
         self.movement_direction = (
             Direction.RIGHT if id % 2 == 0 else Direction.LEFT
         )
-        self.kills = 0
-        self.alive = True
-        self.head = start_position
-        self.body = [self.head]
-        self.size = config.snake.start_size
-        self.speed = config.snake.start_speed
+        self.kills: int = 0
+        self.alive: bool = True
+        self.head: Tuple[int, int] = start_position
+        self.body: List[Tuple[int, int]] = [self.head]
+        self.size: int = size
         self.directions_map = {
             "W": Direction.UP,
             "S": Direction.DOWN,
