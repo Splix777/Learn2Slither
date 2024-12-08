@@ -34,12 +34,12 @@ class GameManager:
         self.console: Optional[Console] = None
         self.window: Optional[pygame.Surface] = None
         self.render: Callable = lambda: None
-        # < -- Initialize -->
+        # <-- Initialize -->
         self.initialize()
 
     def initialize(self) -> None:
         for snake in self.board.snakes:
-            self.game_controllers[snake.id] = snake.change_direction
+            self.game_controllers[snake.id] = snake.snake_controller
 
         if self.game_visuals == "cli":
             self.console: Console = Console()
@@ -121,8 +121,8 @@ class GameManager:
             List[int]: The snake's vision of the board.
         """
         head_x, head_y = snake.head
-        board_height = self.config.map.board_size.height
-        board_width = self.config.map.board_size.width
+        board_height = self.board.height
+        board_width = self.board.width
 
         # Mapping of board elements to numeric values
         state_mapping = {
@@ -134,7 +134,7 @@ class GameManager:
             "empty": 5,
         }
 
-        # Compute vision in four directions and convert to numeric values
+        # Compute vision in four cardinal directions
         vision = {
             "up": [
                 state_mapping[self.board.map[x][head_y]]
@@ -171,7 +171,7 @@ class GameManager:
                 the reward, and whether the game is done.
         """
         snake = self.board.snakes[0]
-        snake.change_direction(action)
+        snake.snake_controller(action)
 
         self.update()
 

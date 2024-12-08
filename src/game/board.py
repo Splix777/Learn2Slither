@@ -136,7 +136,7 @@ class GameBoard:
 
         Args:
             snake (Snake): The snake to check.
-            all_snakes (List[Snake]): List of all snakes in the game.
+            snakes (List[Snake]): List of all snakes in the game.
 
         Returns:
             bool: True if the snake collided with another snake or itself, otherwise False.

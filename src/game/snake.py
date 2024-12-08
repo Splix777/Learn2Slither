@@ -7,7 +7,9 @@ class Snake:
     def __init__(self, id: int, size: int, start_pos: Tuple[int, int]) -> None:
         self.id: int = id
         self.movement_direction = (
-            Direction.RIGHT if id % 2 == 0 else Direction.LEFT
+            Direction.RIGHT
+            if id % 2 == 0
+            else Direction.LEFT
         )
         self.size: int = size
         self.kills: int = 0
@@ -24,7 +26,7 @@ class Snake:
 
     def initialize(self) -> None:
         for body in range(1, self.size):
-            snake_segment: Tuple[int] = (
+            snake_segment: Tuple[int, int] = (
                 self.head[0],
                 self.head[1] - body
                 if self.id % 2 == 0
@@ -32,7 +34,7 @@ class Snake:
             )
             self.body.append(snake_segment)
 
-    def change_direction(self, direction: int) -> None:
+    def snake_controller(self, direction: int) -> None:
         """
         Change the snake's direction based on keyboard input
         or neural network output.

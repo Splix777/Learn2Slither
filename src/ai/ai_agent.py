@@ -23,14 +23,6 @@ class DQNSnake(nn.Module):
             nn.ReLU(),
             nn.Linear(128, output_size)
         )
-        self.state_mapping = {
-            "wall": 0,
-            "snake_head": 1,
-            "snake_body": 2,
-            "green_apple": 3,
-            "red_apple": 4,
-            "empty": 5
-        }
 
     def forward(self, x: List[int]) -> torch.Tensor:
         """
@@ -40,7 +32,8 @@ class DQNSnake(nn.Module):
             x (dict[str, list[str]]): The state of the game.
 
         Returns:
-            torch.Tensor: The Q-values of each action. (left, right, forward)
+            torch.Tensor: The Q-values of each action.
+                (up, down, left, right)
         """
         processed_state: torch.Tensor = torch.FloatTensor(x).unsqueeze(0)
         return self.model(processed_state)
@@ -52,18 +45,15 @@ class AIAgent:
         self.input_size = input_size
         self.action_size = action_size
         self.epsilon = config.neural_network.training.exploration.initial_rate
-        self.epsilon_min = (
-            config.neural_network.training.exploration.minimum_rate
-        )
+        self.epsilon_min = config.neural_network.training.exploration.minimum_rate
         self.epsilon_decay = config.neural_network.training.exploration.decay
         self.gamma = config.neural_network.training.discount_factor
         self.learning_rate = config.neural_network.training.learning_rate
-
-        # Neural network and optimizer
+        # <-- Neural network and optimizer -->
         self.model = DQNSnake(input_size, action_size)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.criterion = nn.MSELoss()
-        # Replay buffer
+        # <-- Replay buffer -->
         self.memory = deque(maxlen=200_000)
 
     def remember(self, state, action, reward, next_state, done) -> None:
@@ -72,11 +62,13 @@ class AIAgent:
     def act(self, state) -> int:
         # Exploration vs Exploitation
         if random.random() <= self.epsilon:
-            return random.randrange(self.action_size)  # Random action
+            # Random Action
+            return random.randrange(self.action_size)
 
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
         q_values = self.model(state_tensor)
-        return int(x=torch.argmax(input=q_values).item())  # Best action
+        # Best Action
+        return int(x=torch.argmax(input=q_values).item())
 
     def replay(self, batch_size) -> None:
         if len(self.memory) < batch_size:
@@ -93,18 +85,13 @@ class AIAgent:
             target_tensor = self.model(state_tensor).clone().detach()
 
             target_tensor = target_tensor.squeeze(0)
-
-            # Print shape and action for debugging
-            # print(f"target_tensor shape: {target_tensor.shape}")
-            # print(f"action: {action}")
             
-            if action < target_tensor.shape[1]:  # Ensure the action is within bounds
+            if action < target_tensor.shape[1]: 
                 target_tensor[0][action] = target
             else:
                 pass
                 # print(f"Warning: Action {action} is out of bounds for target_tensor of size {target_tensor.shape}")
         
-
             # Train the network
             self.optimizer.zero_grad()
             loss = self.criterion(self.model(state_tensor), target_tensor)
@@ -126,17 +113,14 @@ if __name__ == "__main__":
     episodes = 1000
     batch_size = 32
 
-    # print(agent.model.forward(game_manager.get_snake_vision(game_manager.snakes[0])))
-
     for e in range(episodes):
-        # Reset the game
         game_manager = GameManager(config, textures)
         state = game_manager.get_snake_vision(game_manager.snakes[0])
         total_reward = 0
 
-        while True:  # Game loop
+        while True:
             action = agent.act(state)
-            next_state, reward, done = game_manager.step(action)  # Implement step logic
+            next_state, reward, done = game_manager.step(action)
 
             agent.remember(state, action, reward, next_state, done)
             state = next_state
@@ -145,6 +129,6 @@ if __name__ == "__main__":
             if done:
                 print(f"Episode {e + 1}/{episodes}, Total Reward: {total_reward}")
                 break
-            time.sleep(0.2)
+            time.sleep(0.1)
 
         agent.replay(batch_size)
