@@ -4,68 +4,48 @@ from src.utils.directions import Direction
 
 
 class Snake:
-    def __init__(
-        self,
-        id: int,
-        size: int,
-        start_position: Tuple[int, int],
-    ):
-        self.id = id
+    def __init__(self, id: int, size: int, start_pos: Tuple[int, int]) -> None:
+        self.id: int = id
         self.movement_direction = (
             Direction.RIGHT if id % 2 == 0 else Direction.LEFT
         )
+        self.size: int = size
         self.kills: int = 0
         self.alive: bool = True
-        self.head: Tuple[int, int] = start_position
+        self.head: Tuple[int, int] = start_pos
         self.body: List[Tuple[int, int]] = [self.head]
-        self.size: int = size
-        self.directions_map = {
-            "W": Direction.UP,
-            "S": Direction.DOWN,
-            "A": Direction.LEFT,
-            "D": Direction.RIGHT,
+        self.directions_map: dict[int, Direction] = {
+            0: Direction.UP,
+            1: Direction.DOWN,
+            2: Direction.LEFT,
+            3: Direction.RIGHT,
         }
         self.initialize()
 
     def initialize(self) -> None:
         for body in range(1, self.size):
-            new_part = (
+            snake_segment: Tuple[int] = (
                 self.head[0],
                 self.head[1] - body
                 if self.id % 2 == 0
                 else self.head[1] + body,
             )
-            self.body.append(new_part)
+            self.body.append(snake_segment)
 
-    def change_direction(self, direction: str | int) -> None:
+    def change_direction(self, direction: int) -> None:
         """
-        Change the snake's direction based on keyboard input or neural network output.
+        Change the snake's direction based on keyboard input
+        or neural network output.
 
         Args:
-            direction (str or int): Direction to change to (can be a string or integer).
+            direction (int): The direction to change to.
         """
-        if isinstance(direction, str):
-            # If the direction is a string ('W', 'S', 'A', 'D')
-            if (
-                direction in self.directions_map
-                and self.directions_map[direction]
-                != self.movement_direction.opposite
-            ):
-                self.movement_direction = self.directions_map[direction]
-
-        elif isinstance(direction, int):
-            # If the direction is an integer (0, 1, 2, 3)
-            # Map the integer to the corresponding keyboard direction
-            direction_map = {0: "W", 1: "S", 2: "A", 3: "D"}
-            keyboard_direction = direction_map.get(direction)
-            if (
-                keyboard_direction
-                and self.directions_map[keyboard_direction]
-                != self.movement_direction.opposite
-            ):
-                self.movement_direction = self.directions_map[
-                    keyboard_direction
-                ]
+        if (
+            direction in self.directions_map
+            and self.directions_map[direction] 
+            != self.movement_direction.opposite
+        ):
+            self.movement_direction: Direction = self.directions_map[direction]
 
     def move(self) -> List[Tuple[int, int]]:
         """

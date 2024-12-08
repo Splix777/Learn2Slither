@@ -9,10 +9,11 @@ import pygame
 from rich.text import Text
 from rich.console import Console
 
-from src.config.settings import Config
+from src.config.settings import Config, config
 from src.game.board import GameBoard
 from src.game.snake import Snake
 from src.ui.game_textures import GameTextures
+from src.utils.keyboard_handler import KeyListener
 
 
 class GameManager:
@@ -28,52 +29,33 @@ class GameManager:
         self.textures: GameTextures = textures
         self.board: GameBoard = GameBoard(config=config)
         self.game_controllers: dict[int, Callable] = {}
+        self.game_visuals: str = self.config.visual.modes.mode
         self.initialize()
 
     def initialize(self) -> None:
         for snake in self.board.snakes:
             self.game_controllers[snake.id] = snake.change_direction
 
-        self.game_visuals: str = self.config.visual.modes.mode
         if self.game_visuals == "cli":
-            self.console = Console()
-            # If console size is too small print message asking to resize
-            while (
-                os.get_terminal_size().lines
-                < self.config.map.board_size.height + len(self.snakes) + 1
-            ):
-                self.console.clear()
-                self.console.print(
-                    "Please resize your terminal window to fit the game board."
-                )
-            self.render: Callable = self.ascii_mode()
+            self.console: Console = Console()
+            self.render: Callable = self.render_ascii
         else:
             pygame.init()
             self.window: pygame.Surface = pygame.display.set_mode(
-                (
-                    self.config.map.board_size.width * 20,
-                    self.config.map.board_size.height * 20,
-                )
+                size=(self.board.width * 20, self.board.height * 20)
             )
-            self.render: Callable = self.pygame_mode()
+            self.render: Callable = self.render_pygame
 
     def update(self) -> None:
         self.board.add_apples()
-        for snake in self.snakes:
-            self.board.move_snake(snake)
-            if self.board.check_collision(snake, self.snakes):
-                self.snakes.remove(snake)
+        for snake in self.board.snakes:
+            self.board.move_snake(snake=snake)
+            if self.board.check_collision(snake=snake, snakes=self.board.snakes):
                 snake.alive = False
             self.board.check_apple_eaten(snake)
             self.board.update_snake_position(snake)
 
         self.render()
-
-    def ascii_mode(self) -> Callable:
-        return self.render_ascii
-
-    def pygame_mode(self) -> Callable:
-        return self.render_pygame
 
     def render_ascii(self) -> None:
         board_text = Text()
@@ -83,8 +65,7 @@ class GameManager:
                 board_text += self.textures.textures[cell]
             board_text += "\n"
         self.console.print(board_text, justify="center")
-        # Print snakes length and kills
-        for snake in self.snakes:
+        for snake in self.board.snakes:
             self.console.print(
                 f"Snake {snake.id + 1}: "
                 f"Length: {len(snake.body)} | Kills: {snake.kills}",
@@ -92,14 +73,13 @@ class GameManager:
             )
 
     def render_pygame(self) -> None:
-        self.window.fill((0, 0, 0))
-        for row_num, row in enumerate(self.board.map):
-            for col_num, cell in enumerate(row):
-                if isinstance(self.textures.textures[cell], Path):
-                    texture: pygame.Surface = pygame.image.load(
-                        str(self.textures.textures[cell])
-                    )
-                    self.window.blit(texture, (col_num * 20, row_num * 20))
+        self.window.fill(color=(0, 0, 0))
+        for row_num, row in enumerate(iterable=self.board.map):
+            for col_num, cell in enumerate(iterable=row):
+                texture: pygame.Surface = pygame.image.load(
+                    filename=str(self.textures.textures[cell])
+                )
+                self.window.blit(texture, (col_num * 20, row_num * 20))
 
         score_positions = [
             (0, 0),
@@ -108,9 +88,8 @@ class GameManager:
             (self.window.get_width() - 220, self.window.get_height() - 18),
         ]
 
-        # Render scores for each snake
-        font = pygame.font.Font(None, 24)
-        for idx, snake in enumerate(self.snakes):
+        font = pygame.font.Font(name=None, size=24)
+        for idx, snake in enumerate(iterable=self.board.snakes):
             if idx < len(score_positions):
                 text: pygame.Surface = font.render(
                     f"Snake {snake.id + 1}: "
@@ -120,12 +99,15 @@ class GameManager:
                 )
                 self.window.blit(text, score_positions[idx])
 
-        # Update the display
         pygame.display.update()
 
     def get_snake_vision(self, snake: Snake) -> List[int]:
         """
-        Get the snake's vision of the board as a flattened tensor suitable for input to the neural network.
+        Get the snake's vision of the board as a flattened 
+        list of integers. The vision is a 1D array of the
+        board elements in the following order: up, down, left, right.
+        The snake can see in the four cardinal directions up to the
+        walls of the board.
 
         Args:
             snake (Snake): The snake to compute the vision for.
@@ -213,12 +195,8 @@ class GameManager:
 
 
 if __name__ == "__main__":
-    from src.config.settings import get_config
-    from src.utils.keyboard_handler import KeyListener
-
     fps = 6
 
-    config: Config = get_config()
     textures = GameTextures(config)
     game_manager = GameManager(config, textures)
     key_listener = KeyListener()

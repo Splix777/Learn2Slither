@@ -15,13 +15,13 @@ class KeyListener:
         except AttributeError:
             # Handle special keys
             if key == keyboard.Key.up:
-                self.current_key = "W"
+                self.current_key = 0
             elif key == keyboard.Key.down:
-                self.current_key = "S"
+                self.current_key = 1
             elif key == keyboard.Key.left:
-                self.current_key = "A"
+                self.current_key = 2
             elif key == keyboard.Key.right:
-                self.current_key = "D"
+                self.current_key = 3
 
     def get_key(self) -> str | None:
         key: str | None = self.current_key

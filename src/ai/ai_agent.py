@@ -76,7 +76,7 @@ class AIAgent:
 
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
         q_values = self.model(state_tensor)
-        return int(torch.argmax(q_values).item())  # Best action
+        return int(x=torch.argmax(input=q_values).item())  # Best action
 
     def replay(self, batch_size) -> None:
         if len(self.memory) < batch_size:
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     textures = GameTextures(config)
     game_manager = GameManager(config, textures)
     input_size: int = game_manager.board.snake_vision
-    agent = AIAgent(config, input_size=input_size, action_size=3)
+    agent = AIAgent(config, input_size=input_size, action_size=4)
 
     episodes = 1000
     batch_size = 32

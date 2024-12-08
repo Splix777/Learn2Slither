@@ -21,10 +21,10 @@ class GameBoard:
         # <-- Snakes -->
         self.num_snakes: int = config.map.snakes
         self.snake_vision: int = (2 * self.height + 2 * self.width - 4) // 2
-        self.snakes: List[Snake] = []
         self.starting_positions = StartingPositions((self.height, self.width))
         # <-- Initialize Map -->
         self.map: List[List[str]] = self.make_map()
+        self.snakes: List[Snake] = self.create_snakes()
 
     # <-- Map generation methods -->
     def make_map(self) -> List[List[str]]:
@@ -34,6 +34,24 @@ class GameBoard:
         empty_map: List[List[str]] = self._create_blank_map()
         self._add_walls(empty_map)
         return empty_map
+
+    def create_snakes(self) -> List[Snake]:
+        """
+        Create snakes for the game.
+
+        Returns:
+            List[Snake]: A list of snakes.
+        """
+        snakes: List[Snake] = []
+        for snake_num in range(self.num_snakes):
+            snake = Snake(
+                id=snake_num,
+                size=self.config.snake.start_size,
+                start_pos=self.starting_positions.positions[snake_num],
+            )
+            snakes.append(snake)
+            self.update_snake_position(snake=snake)
+        return snakes
 
     def _create_blank_map(self) -> List[List[str]]:
         """
@@ -59,24 +77,6 @@ class GameBoard:
                 or col == self.width - 1
             ):
                 game_map[row][col] = "wall"
-
-    def create_snakes(self) -> List[Snake]:
-        """
-        Create snakes for the game.
-
-        Returns:
-            List[Snake]: A list of snakes.
-        """
-        snakes: List[Snake] = []
-        for snake_num in range(self.num_snakes):
-            snake = Snake(
-                id=snake_num,
-                size=self.config.snake.start_size,
-                start_position=self.starting_positions.positions[snake_num],
-            )
-            snakes.append(snake)
-            self.update_snake_position(snake=snake)
-        return snakes
 
     # <-- Utility methods -->
     def get_random_empty_coordinate(self) -> Tuple[int, int]:
@@ -109,12 +109,12 @@ class GameBoard:
             self.current_red_apples += 1
 
     # <-- Collisions -->
-    def check_collision(self, snake: Snake, all_snakes: List[Snake]) -> bool:
-        if self._collided_with_wall(snake):
-            self._delete_snake(snake)
+    def check_collision(self, snake: Snake, snakes: List[Snake]) -> bool:
+        if self._collided_with_wall(snake=snake):
+            self._delete_snake(snake=snake)
             return True
-        if self._collided_with_snake(snake, all_snakes):
-            self._delete_snake(snake)
+        if self._collided_with_snake(snake=snake, snakes=snakes):
+            self._delete_snake(snake=snake)
             return True
         return False
 
@@ -130,7 +130,7 @@ class GameBoard:
         """
         return self.map[snake.head[0]][snake.head[1]] == "wall"
 
-    def _collided_with_snake(self, snake: Snake, all_snakes: List[Snake]) -> bool:
+    def _collided_with_snake(self, snake: Snake, snakes: List[Snake]) -> bool:
         """
         Checks if the snake collided with another snake or itself.
 
@@ -141,20 +141,25 @@ class GameBoard:
         Returns:
             bool: True if the snake collided with another snake or itself, otherwise False.
         """
-        cell = self.map[snake.head[0]][snake.head[1]]
+        cell: str = self.map[snake.head[0]][snake.head[1]]
         if cell not in ["snake_body", "snake_head"]:
             return False
-
-        for other_snake in all_snakes:
+        for other_snake in snakes:
             if snake.head in other_snake.body and snake.id != other_snake.id:
                 other_snake.kills += 1
                 return True
-
         return True
 
     def _delete_snake(self, snake: Snake) -> None:
+        """
+        Delete a snake from the game.
+        
+        Args:
+            snake (Snake): The snake to delete.
+        """
         for segment in range(1, len(snake.body)):
             self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
+        self.snakes.remove(snake)
 
     # <-- Game state update methods -->
     def check_apple_eaten(self, snake: Snake) -> None:
