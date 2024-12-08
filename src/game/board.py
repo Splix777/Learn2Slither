@@ -14,15 +14,17 @@ class GameBoard:
         # self.console = Console()
         self.height: int = config.map.board_size.height
         self.width: int = config.map.board_size.width
+        # 4 cardinal directions not including head
+        self.snake_vision: int = (2 * self.height + 2 * self.width - 4) // 2
         self.green_apples: int = config.map.green_apples
         self.red_apples: int = config.map.red_apples
         self.current_green_apples: int = 0
         self.current_red_apples: int = 0
         # <-- Snakes -->
         self.num_snakes: int = config.map.snakes
-        self.snakes: List[Snake] = []
+        # self.snakes: List[Snake] = []
         self.snake_starting_positions = {
-            0: (1, 3),
+            0: (6, 6),
             1: (1, self.width - 4),
             2: (self.height - 2, 3),
             3: (self.height - 2, self.width - 4),
@@ -142,7 +144,7 @@ class GameBoard:
         for segment in range(1, len(snake.body)):
             self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
 
-    def check_apple_collision(self, snake: Snake) -> None:
+    def check_apple_eaten(self, snake: Snake) -> None:
         if self.map[snake.head[0]][snake.head[1]] == "green_apple":
             self.current_green_apples -= 1
             snake.grow()

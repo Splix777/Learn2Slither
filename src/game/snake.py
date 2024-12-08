@@ -44,19 +44,35 @@ class Snake:
             )
             self.body.append(new_part)
 
-    def change_direction(self, direction: str) -> None:
+    def change_direction(self, direction: str | int) -> None:
         """
-        Change the snake's direction.
+        Change the snake's direction based on keyboard input or neural network output.
 
         Args:
-            direction (str): The direction to change to.
+            direction (str or int): Direction to change to (can be a string or integer).
         """
-        if (
-            direction in self.directions_map
-            and self.directions_map[direction]
-            != self.movement_direction.opposite
-        ):
-            self.movement_direction = self.directions_map[direction]
+        if isinstance(direction, str):
+            # If the direction is a string ('W', 'S', 'A', 'D')
+            if (
+                direction in self.directions_map
+                and self.directions_map[direction]
+                != self.movement_direction.opposite
+            ):
+                self.movement_direction = self.directions_map[direction]
+
+        elif isinstance(direction, int):
+            # If the direction is an integer (0, 1, 2, 3)
+            # Map the integer to the corresponding keyboard direction
+            direction_map = {0: "W", 1: "S", 2: "A", 3: "D"}
+            keyboard_direction = direction_map.get(direction)
+            if (
+                keyboard_direction
+                and self.directions_map[keyboard_direction]
+                != self.movement_direction.opposite
+            ):
+                self.movement_direction = self.directions_map[
+                    keyboard_direction
+                ]
 
     def move(self) -> List[Tuple[int, int]]:
         """
