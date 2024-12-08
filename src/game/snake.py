@@ -1,25 +1,8 @@
-from enum import Enum
 from typing import Tuple, List
 
+from src.utils.directions import Direction
 from src.config.settings import Config
 from src.ui.game_textures import GameTextures
-
-
-class Direction(Enum):
-    UP = (-1, 0)
-    DOWN = (1, 0)
-    LEFT = (0, -1)
-    RIGHT = (0, 1)
-
-    @property
-    def opposite(self) -> "Direction":
-        """Returns the opposite direction."""
-        return {
-            Direction.UP: Direction.DOWN,
-            Direction.DOWN: Direction.UP,
-            Direction.LEFT: Direction.RIGHT,
-            Direction.RIGHT: Direction.LEFT,
-        }[self]
 
 
 class Snake:
@@ -33,6 +16,7 @@ class Snake:
         self.config = config
         self.textures = textures
         self.id = id
+        # Snake index 0 and 2 start moving right, 1 and 3 start moving left
         self.movement_direction = (
             Direction.RIGHT if id % 2 == 0 else Direction.LEFT
         )
@@ -59,7 +43,20 @@ class Snake:
                 else self.head[1] + body,
             )
             self.body.append(new_part)
-            
+
+    def change_direction(self, direction: str) -> None:
+        """
+        Change the snake's direction.
+
+        Args:
+            direction (str): The direction to change to.
+        """
+        if (
+            direction in self.directions_map
+            and self.directions_map[direction]
+            != self.movement_direction.opposite
+        ):
+            self.movement_direction = self.directions_map[direction]
 
     def move(self) -> List[Tuple[int, int]]:
         """
@@ -68,12 +65,9 @@ class Snake:
         Returns:
             List[Tuple[int, int]]: The area no longer occupied by the snake.
         """
+        removed_tails: List[Tuple[int, int]] = []
         if not self.alive:
-            return self.body
-
-        # Ignore input if trying to move in the opposite direction
-        if self.movement_direction == self.movement_direction.opposite:
-            return []
+            return removed_tails
 
         # Calculate new head position
         new_head = (
@@ -83,7 +77,18 @@ class Snake:
 
         # Update snake's body
         self.body.insert(0, new_head)
-        self.head = new_head
+        self.head: Tuple[int, int] = new_head
 
-        # Remove the tail if the snake is longer than its size
-        return [self.body.pop()] if len(self.body) > self.size else []
+        # Add or remove tails to match the snake's size
+        while len(self.body) > self.size:
+            removed_tails.append(self.body.pop())
+
+        return removed_tails
+
+    def grow(self) -> None:
+        """Grow the snake by one unit."""
+        self.size += 1
+
+    def shrink(self) -> None:
+        """Shrink the snake by one unit."""
+        self.size -= 1

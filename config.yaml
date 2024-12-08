@@ -13,11 +13,11 @@ logging:
 
 map:
   board_size:
-    width: 40
+    width: 80
     height: 10
   green_apples: 2
   red_apples: 1
-  snakes: 1
+  snakes: 4
 
 snake:
   start_color: blue
@@ -35,7 +35,7 @@ snake:
 
 visual:
   modes:
-    mode: cli
+    mode: pygame
     available_modes:
       - cli
       - pygame

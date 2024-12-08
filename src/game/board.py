@@ -10,7 +10,8 @@ from src.game.snake import Snake
 class GameBoard:
     def __init__(self, config: Config, textures: GameTextures):
         self.config: Config = config
-        self.textures: GameTextures = textures
+        # self.textures: GameTextures = textures
+        # self.console = Console()
         self.height: int = config.map.board_size.height
         self.width: int = config.map.board_size.width
         self.green_apples: int = config.map.green_apples
@@ -94,40 +95,74 @@ class GameBoard:
             self.current_red_apples += 1
 
     # <-- Create Snakes -->
-    def check_collision(self, snake: Snake) -> bool:
-        return self.map[snake.head[1]][snake.head[0]] in [
-            "wall",
-            "snake_body",
-            "snake_head",
-        ]
+    def check_collision(self, snake: Snake, all_snakes: List[Snake]) -> bool:
+        if self._collided_with_wall(snake):
+            self._delete_snake(snake)
+            return True
+        if self._collided_with_snake(snake, all_snakes):
+            self._delete_snake(snake)
+            return True
+        return False
+
+    def _collided_with_wall(self, snake: Snake) -> bool:
+        """
+        Checks if the snake collided with a wall.
+
+        Args:
+            snake (Snake): The snake to check.
+
+        Returns:
+            bool: True if the snake collided with a wall, otherwise False.
+        """
+        return self.map[snake.head[0]][snake.head[1]] == "wall"
+
+    def _collided_with_snake(self, snake: Snake, all_snakes: List[Snake]) -> bool:
+        """
+        Checks if the snake collided with another snake or itself.
+
+        Args:
+            snake (Snake): The snake to check.
+            all_snakes (List[Snake]): List of all snakes in the game.
+
+        Returns:
+            bool: True if the snake collided with another snake or itself, otherwise False.
+        """
+        cell = self.map[snake.head[0]][snake.head[1]]
+        if cell not in ["snake_body", "snake_head"]:
+            return False
+
+        for other_snake in all_snakes:
+            if snake.head in other_snake.body and snake.id != other_snake.id:
+                other_snake.kills += 1
+                return True
+
+        return True
+
+    def _delete_snake(self, snake: Snake) -> None:
+        for segment in range(1, len(snake.body)):
+            self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
+
+    def check_apple_collision(self, snake: Snake) -> None:
+        if self.map[snake.head[0]][snake.head[1]] == "green_apple":
+            self.current_green_apples -= 1
+            snake.grow()
+        elif self.map[snake.head[0]][snake.head[1]] == "red_apple":
+            self.current_red_apples -= 1
+            snake.shrink()
 
     def update_snake_position(self, snake: Snake) -> None:
+        if not snake.alive:
+            return
         for segment in snake.body:
             if segment == snake.head:
                 self.map[segment[0]][segment[1]] = "snake_head"
             else:
                 self.map[segment[0]][segment[1]] = "snake_body"
 
-
-    def render(self) -> None:
-        return (
-            self._render_ascii()
-            if self.textures.gui_mode == "cli"
-            else self._render_pygame()
-        )
-
-    def _render_ascii(self) -> None:
-        from rich.console import Console
-
-        console = Console()
-
-        for row in self.map:
-            for cell in row:
-                console.print(self.textures.textures[cell], end="")
-            console.print()
-
-    def _render_pygame(self) -> None:
-        pass
+    def move_snake(self, snake: Snake) -> None:
+        empty_spaces: List[Tuple[int, int]] = snake.move()
+        for space in empty_spaces:
+            self.map[space[0]][space[1]] = "empty"
 
 
 if __name__ == "__main__":
