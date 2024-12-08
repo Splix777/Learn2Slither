@@ -55,11 +55,8 @@ class GameManager:
 
         return snakes
 
-    def play_step(self) -> None:
-        self.board.add_apples()
-        self.update()
-
     def update(self) -> None:
+        self.board.add_apples()
         for snake in self.snakes:
             self.board.move_snake(snake)
             if self.board.check_collision(snake, self.snakes):
@@ -138,5 +135,5 @@ if __name__ == "__main__":
         # Human can only be p1
         if key := key_listener.get_key():
             game_manager.game_controllers[0](key)
-        game_manager.play_step()
+        game_manager.update()
         time.sleep(1 / fps)
