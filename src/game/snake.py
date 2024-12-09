@@ -13,14 +13,16 @@ class Snake:
         )
         self.size: int = size
         self.kills: int = 0
+        self.red_apples_eaten: int = 0
+        self.green_apples_eaten: int = 0
         self.alive: bool = True
         self.head: Tuple[int, int] = start_pos
         self.body: List[Tuple[int, int]] = [self.head]
         self.directions_map: dict[int, Direction] = {
-            0: Direction.UP,
-            1: Direction.DOWN,
-            2: Direction.LEFT,
-            3: Direction.RIGHT,
+            1: Direction.UP,
+            2: Direction.DOWN,
+            3: Direction.LEFT,
+            4: Direction.RIGHT,
         }
         self.initialize()
 
@@ -34,20 +36,36 @@ class Snake:
             )
             self.body.append(snake_segment)
 
-    def snake_controller(self, direction: int) -> None:
+    @property
+    def direction_one_hot(self) -> List[int]:
+        mapping = {
+            Direction.UP: [1, 0, 0, 0],
+            Direction.DOWN: [0, 1, 0, 0],
+            Direction.LEFT: [0, 0, 1, 0],
+            Direction.RIGHT: [0, 0, 0, 1],
+        }
+        return mapping[self.movement_direction]
+    
+    @property
+    def possible_directions(self) -> List[int]:
+        """Returns possible directions that the snake can move in."""
+        # Return a one-hot encoded list of the possible directions.
+        return [
+            1 if self.directions_map[i] != self.movement_direction.opposite else 0
+            for i in range(1, 5)
+        ]
+
+    def snake_controller(self, direction: list[int]) -> None:
         """
         Change the snake's direction based on keyboard input
         or neural network output.
 
         Args:
-            direction (int): The direction to change to.
+            direction list[int]: The direction to move the snake in one_hot encoding.
         """
-        if (
-            direction in self.directions_map
-            and self.directions_map[direction] 
-            != self.movement_direction.opposite
-        ):
-            self.movement_direction: Direction = self.directions_map[direction]
+        for i, d in enumerate(direction):
+            if d == 1:
+                self.movement_direction = self.directions_map[i + 1]
 
     def move(self) -> List[Tuple[int, int]]:
         """
@@ -80,3 +98,5 @@ class Snake:
     def shrink(self) -> None:
         """Shrink the snake by one unit."""
         self.size -= 1
+        if self.size == 0:
+            self.alive = False

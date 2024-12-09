@@ -11,10 +11,10 @@ class StartingPositions:
     @property
     def positions(self) -> dict[int, Tuple[int, int]]:
         return {
-            0: (1, 3),
-            1: (1, self.width - 4),
-            2: (self.height - 2, 3),
-            3: (self.height - 2, self.width - 4),
+            0: (3, 3),
+            1: (3, self.width - 4),
+            2: (self.height - 4, 3),
+            3: (self.height - 4, self.width - 4),
         }
 
 if __name__ == "__main__":

@@ -168,7 +168,7 @@ class ArchitectureConfig(BaseModel):
 
 class ExplorationConfig(BaseModel):
     """Exploration configuration model."""
-    initial_rate: float
+    epsilon: float
     decay: float
     minimum_rate: float
 

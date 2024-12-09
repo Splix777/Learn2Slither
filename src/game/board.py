@@ -20,7 +20,6 @@ class GameBoard:
         self.current_red_apples: int = 0
         # <-- Snakes -->
         self.num_snakes: int = config.map.snakes
-        self.snake_vision: int = (2 * self.height + 2 * self.width - 4) // 2
         self.starting_positions = StartingPositions((self.height, self.width))
         # <-- Initialize Map -->
         self.map: List[List[str]] = self.make_map()
@@ -159,16 +158,21 @@ class GameBoard:
         """
         for segment in range(1, len(snake.body)):
             self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
-        self.snakes.remove(snake)
+        # self.snakes.remove(snake)
 
     # <-- Game state update methods -->
-    def check_apple_eaten(self, snake: Snake) -> None:
+    def check_apple_eaten(self, snake: Snake) -> str | None:
         if self.map[snake.head[0]][snake.head[1]] == "green_apple":
             self.current_green_apples -= 1
+            snake.green_apples_eaten += 1
             snake.grow()
+            return "green_apple"
         elif self.map[snake.head[0]][snake.head[1]] == "red_apple":
             self.current_red_apples -= 1
+            snake.red_apples_eaten += 1
             snake.shrink()
+            return "red_apple"
+        return None
 
     def update_snake_position(self, snake: Snake) -> None:
         if not snake.alive:

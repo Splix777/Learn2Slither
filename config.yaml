@@ -15,8 +15,8 @@ map:
   board_size:
     width: 40
     height: 10
-  green_apples: 2
-  red_apples: 1
+  green_apples: 16
+  red_apples: 8
   snakes: 1
 
 snake:
@@ -35,7 +35,7 @@ snake:
 
 visual:
   modes:
-    mode: cli
+    mode: pygame
     available_modes:
       - cli
       - pygame
@@ -84,7 +84,7 @@ rules:
   collisions:
     snake_kill:
       action: death
-      reward: 15
+      reward: 10
       snake_effect: 0
     wall_collision:
       action: death
@@ -100,7 +100,7 @@ rules:
       snake_effect: -1
   win_condition:
     condition: max_snake_size
-    max_score: 10
+    max_score: 1
 
 neural_network:
   architecture:
@@ -114,12 +114,12 @@ neural_network:
     optimizer: adam
     loss_function: mse
   training:
-    batch_size: 64
-    epochs: 50
+    batch_size: 32
+    epochs: 10_000
     learning_rate: 0.001
     exploration:
-      initial_rate: 1.0
-      decay: 0.99
+      epsilon: 1.0
+      decay: 0.995
       minimum_rate: 0.01
     discount_factor: 0.9
 
