@@ -16,7 +16,3 @@ class StartingPositions:
             2: (self.height - 4, 3),
             3: (self.height - 4, self.width - 4),
         }
-
-if __name__ == "__main__":
-    starting_positions = StartingPositions((10, 10))
-    print(starting_positions.positions)

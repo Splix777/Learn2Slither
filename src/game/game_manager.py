@@ -163,7 +163,7 @@ class GameManager:
 
         pygame.display.update()
 
-    def get_distance_to_objects(self, head_x: int, head_y: int, target: str) -> List[int]:
+    def target_distances(self, x: int, y: int, target: str) -> List[int]:
         """
         Calculate the distance to the nearest target
         object in each cardinal direction.
@@ -180,41 +180,43 @@ class GameManager:
         directions = [0] * 4
 
         # Up
-        for x in range(head_x - 1, -1, -1):
-            if self.board.map[x][head_y] == target:
-                directions[0] = 1
+        for x in range(x - 1, -1, -1):
+            if self.board.map[x][y] == target:
+                directions[0] = x
                 break
-
         # Down
-        for x in range(head_x + 1, self.board.height):
-            if self.board.map[x][head_y] == target:
-                directions[1] = 1
+        for x in range(x + 1, self.board.height):
+            if self.board.map[x][y] == target:
+                directions[1] = x
                 break
-
         # Left
-        for y in range(head_y - 1, -1, -1):
-            if self.board.map[head_x][y] == target:
-                directions[2] = 1
+        for y in range(y - 1, -1, -1):
+            if self.board.map[x][y] == target:
+                directions[2] = x
                 break
-
         # Right
-        for y in range(head_y + 1, self.board.width):
-            if self.board.map[head_x][y] == target:
-                directions[3] = 1
+        for y in range(y + 1, self.board.width):
+            if self.board.map[x][y] == target:
+                directions[3] = x
                 break
 
         return directions
 
-    def get_immediate_danger(self, head_x, head_y) -> List[int]:
+    def get_immediate_danger(self, x, y) -> List[int]:
+        collision = ["wall", "snake_body", "snake_head"]
         danger: List[int] = [0] * 4
 
-        if head_x < 0 or self.board.map[head_x - 1][head_y] in ["wall", "snake_body"]:
+        # Up
+        if x < 0 or self.board.map[x - 1][y] in collision:
             danger[0] = 1
-        if head_x + 1 >= self.board.height or self.board.map[head_x + 1][head_y] in ["wall", "snake_body"]:
+        # Down
+        if x + 1 >= self.board.height or self.board.map[x + 1][y] in collision:
             danger[1] = 1
-        if head_y < 0 or self.board.map[head_x][head_y - 1] in ["wall", "snake_body"]:
+        # Left
+        if y < 0 or self.board.map[x][y - 1] in collision:
             danger[2] = 1
-        if head_y + 1 >= self.board.width or self.board.map[head_x][head_y + 1] in ["wall", "snake_body"]:
+        # Right
+        if y + 1 >= self.board.width or self.board.map[x][y + 1] in collision:
             danger[3] = 1
 
         return danger
@@ -233,23 +235,23 @@ class GameManager:
 
         # Snake's current direction as one-hot encoding
         current_direction = snake.direction_one_hot
+        # Possible direction based on current direction
+        possible_directions = snake.possible_directions
 
-        # Distances to nearest green and red apples in each cardinal direction
-        green_apple_distances = self.get_distance_to_objects(head_x, head_y, "green_apple")
-        red_apple_distances = self.get_distance_to_objects(head_x, head_y, "red_apple")
+        # Distances to nearest apples and walls in each cardinal direction
+        green_apples = self.target_distances(head_x, head_y, "green_apple")
+        red_apples = self.target_distances(head_x, head_y, "red_apple")
+        walls = self.target_distances(head_x, head_y, "wall")
 
         # Immediate danger flags
         immediate_danger = self.get_immediate_danger(head_x, head_y)
 
-        # Possible direction based on current direction
-        # 0: up, 1: down, 2: left, 3: right
-        possible_directions = snake.possible_directions
-
         # Combine all features into a single state vector
         return (
-            current_direction 
-            + green_apple_distances
-            + red_apple_distances 
+            current_direction
+            + green_apples
+            + red_apples
+            + walls
             + immediate_danger 
             + possible_directions
         )

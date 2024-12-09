@@ -170,7 +170,7 @@ class ExplorationConfig(BaseModel):
     """Exploration configuration model."""
     epsilon: float
     decay: float
-    minimum_rate: float
+    epsilon_min: float
 
 
 class TrainingConfig(BaseModel):
@@ -179,7 +179,7 @@ class TrainingConfig(BaseModel):
     epochs: int
     learning_rate: float
     exploration: ExplorationConfig
-    discount_factor: float
+    gamma: float
 
 
 class NeuralNetworkConfig(BaseModel):

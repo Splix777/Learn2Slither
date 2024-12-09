@@ -1,6 +1,6 @@
 from typing import Tuple, List
 
-from src.utils.directions import Direction
+from src.game.models.directions import Direction
 
 
 class Snake:
@@ -61,7 +61,8 @@ class Snake:
         or neural network output.
 
         Args:
-            direction list[int]: The direction to move the snake in one_hot encoding.
+            direction list[int]: The direction to move the
+                snake in one_hot encoding.
         """
         for i, d in enumerate(direction):
             if d == 1:
@@ -72,7 +73,8 @@ class Snake:
         Move the snake in the current direction.
 
         Returns:
-            List[Tuple[int, int]]: The area no longer occupied by the snake.
+            List[Tuple[int, int]]: The area no longer
+                occupied by the snake.
         """
         removed_tails: List[Tuple[int, int]] = []
         if not self.alive:

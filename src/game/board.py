@@ -3,7 +3,7 @@ from typing import List, Tuple
 from itertools import product
 
 from src.config.settings import Config
-from src.utils.starting_positions import StartingPositions
+from src.game.models.starting_positions import StartingPositions
 from src.game.snake import Snake
 
 

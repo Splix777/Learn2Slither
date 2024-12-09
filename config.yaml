@@ -105,23 +105,23 @@ rules:
 neural_network:
   architecture:
     layers:
-      input_size: 16  # Based on snake vision
-      hidden: [32, 64, 32]  # Adjustable hidden layers
-      output_size: 4  # Directions: up, down, left, right
+      input_size: 16 
+      hidden: [128, 256, 128]
+      output_size: 4
     activation_function:
       function: relu
       output_function: softmax
     optimizer: adam
     loss_function: mse
   training:
-    batch_size: 32
+    batch_size: 64
     epochs: 10_000
     learning_rate: 0.001
     exploration:
       epsilon: 1.0
       decay: 0.995
-      minimum_rate: 0.01
-    discount_factor: 0.9
+      epsilon_min: 0.1
+    gamma: 0.9
 
 paths:
   models: models
