@@ -8,14 +8,14 @@ from rich.text import Text
 from rich.console import Console
 
 from src.config.settings import Config
-from src.game.board import GameBoard
+from src.game.enviroment import Enviroment
 from src.game.snake import Snake
-from src.ui.game_textures import GameTextures
+from src.ui.texture_loader import TextureLoader
 from src.utils.keyboard_handler import KeyListener
 
 
-class GameManager:
-    def __init__(self, config: Config, textures: GameTextures) -> None:
+class Interpreter:
+    def __init__(self, config: Config, textures: TextureLoader) -> None:
         """
         Game manager class.
 
@@ -24,8 +24,8 @@ class GameManager:
             textures (GameTextures): The game textures.
         """
         self.config: Config = config
-        self.textures: GameTextures = textures
-        self.board: GameBoard = GameBoard(config=config)
+        self.textures: TextureLoader = textures
+        self.board: Enviroment = Enviroment(config=config)
         self.game_visuals: str = self.config.visual.modes.mode
         self.game_controllers: Dict[int, Callable[[list[int]], None]] = {}
         # <-- GUI Optionals -->
@@ -98,7 +98,7 @@ class GameManager:
         self.board.update_snake_position(snake)
         self.board.add_apples()
 
-        # self.render()
+        self.render()
 
         # if not snake.alive:
         #     done = True
@@ -264,4 +264,4 @@ class GameManager:
 
 
     def reset(self) -> None:
-        self.board = GameBoard(config=self.config)
+        self.board = Enviroment(config=self.config)

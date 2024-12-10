@@ -5,7 +5,7 @@ from rich.style import Style
 from src.config.settings import Config, get_config
 
 
-class GameTextures:
+class TextureLoader:
     KEYS: list[str] = [
         "wall",
         "snake_head",
@@ -79,6 +79,6 @@ def print_textures(textures: dict):
 
 if __name__ == "__main__":
     config = get_config()
-    textures = GameTextures(config)
+    textures = TextureLoader(config)
 
     print_textures(textures.textures)

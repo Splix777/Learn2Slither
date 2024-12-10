@@ -7,7 +7,7 @@ from src.game.models.starting_positions import StartingPositions
 from src.game.snake import Snake
 
 
-class GameBoard:
+class Enviroment:
     def __init__(self, config: Config):
         self.config: Config = config
         # <-- Map Dimensions -->

@@ -1,55 +1,67 @@
-from typing import Optional, List
-
-import numpy as np
-
+from typing import Union
 import torch
 import torch.nn as nn
 from pathlib import Path
 
 
 class DQNSnake(nn.Module):
-    def __init__(self, input_size: int, output_size: int):
+    def __init__(self, input_size: int, output_size: int) -> None:
         """
         A deep Q-network for the Snake AI.
 
         Args:
             input_size (int): The size of the input state.
             output_size (int): The number of possible actions.
-            scaler (MinMaxScaler): Scaler to scaler states.
         """
         super().__init__()
         self.model = nn.Sequential(
             nn.Linear(input_size, 128),
             nn.LeakyReLU(0.01),
-            # nn.Linear(64, 64),
-            # nn.LeakyReLU(0.01),
             nn.Linear(128, output_size)
         )
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass for the network.
 
         Args:
-            x (Tensor): Game state of snake.
-        """
-        return self.model(x)
+            x (torch.Tensor): A batch of game states for the Snake game.
 
-    def save(self, path: str) -> None:
+        Returns:
+            torch.Tensor: Output tensor representing Q-values for each action.
         """
-        Save the model and scaler to a specified file.
-        """
-        torch.save({'model_state_dict': self.state_dict()}, path)
+        return self.model(x.to(self.device))
 
-    def load(self, path: str) -> None:
+    def save(self, path: Union[str, Path]) -> None:
         """
-        Loads the model weights from a specified file.
+        Save the model's state dictionary to a specified file.
 
         Args:
-            path (str): Path to the saved model file.
+            path (Union[str, Path]): The file path where the model will be saved.
         """
-        if not Path(path).exists():
+        path = Path(path)  # Ensure it's a Path object
+        torch.save(self.state_dict(), path)
+        print(f"Model saved to {path}")
+
+    def load(self, path: Union[str, Path]) -> None:
+        """
+        Load the model weights from a specified file.
+
+        Args:
+            path (Union[str, Path]): Path to the saved model file.
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist.
+        """
+        path = Path(path)
+        if not path.exists():
             raise FileNotFoundError(f"Model file not found at {path}")
         
-        checkpoint = torch.load(path)
-        self.load_state_dict(checkpoint['model_state_dict'])
+        try:
+            self.load_state_dict(torch.load(path, map_location=self.device))
+            self.to(self.device)
+            print(f"Model loaded from {path}")
+        except Exception as e:
+            raise RuntimeError(f"Error loading model from {path}: {e}")
