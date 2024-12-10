@@ -7,7 +7,7 @@ import pygame
 from rich.text import Text
 from rich.console import Console
 
-from src.config.settings import Config, config
+from src.config.settings import Config
 from src.game.board import GameBoard
 from src.game.snake import Snake
 from src.ui.game_textures import GameTextures
@@ -38,6 +38,7 @@ class GameManager:
     def initialize(self) -> None:
         for snake in self.board.snakes:
             self.game_controllers[snake.id] = snake.snake_controller
+        self.board.add_apples()
 
         if self.game_visuals == "cli":
             self.console = Console()
@@ -80,7 +81,6 @@ class GameManager:
         reward = 0
 
         # self.update()
-        self.board.add_apples()
         self.board.move_snake(snake=snake)
         if self.board.check_collision(snake=snake, snakes=self.board.snakes):
             snake.alive = False
@@ -96,8 +96,9 @@ class GameManager:
                 return reward, True, snake.size
             
         self.board.update_snake_position(snake)
+        self.board.add_apples()
 
-        self.render()
+        # self.render()
 
         # if not snake.alive:
         #     done = True
@@ -163,48 +164,55 @@ class GameManager:
 
         pygame.display.update()
 
-    def target_distances(self, x: int, y: int, target: str) -> List[int]:
+    def target_distances(self, x: int, y: int, target: str) -> List[float]:
         """
-        Calculate the distance to the nearest target
-        object in each cardinal direction.
+        Calculate the distance to the nearest target object in each cardinal direction.
 
         Args:
-            head_x (int): Snake's head x-coordinate.
-            head_y (int): Snake's head y-coordinate.
+            x (int): Snake's head x-coordinate.
+            y (int): Snake's head y-coordinate.
             target (str): Target object type (e.g., "green_apple").
 
         Returns:
-            List[float]: Distances to the target object in
-                [up, down, left, right].
+            List[float]: Distances to the target object in [up, down, left, right], scaled to [0, 1].
         """
         directions = [0] * 4
 
         # Up
-        for x in range(x - 1, -1, -1):
-            if self.board.map[x][y] == target:
-                directions[0] = x
+        for i in range(1, x + 1):
+            if self.board.map[x - i][y] == target:
+                directions[0] = i
                 break
+
         # Down
-        for x in range(x + 1, self.board.height):
-            if self.board.map[x][y] == target:
-                directions[1] = x
+        for i in range(1, self.board.height - x):
+            if self.board.map[x + i][y] == target:
+                directions[1] = i
                 break
+
         # Left
-        for y in range(y - 1, -1, -1):
-            if self.board.map[x][y] == target:
-                directions[2] = x
+        for i in range(1, y + 1):
+            if self.board.map[x][y - i] == target:
+                directions[2] = i
                 break
+
         # Right
-        for y in range(y + 1, self.board.width):
-            if self.board.map[x][y] == target:
-                directions[3] = x
+        for i in range(1, self.board.width - y):
+            if self.board.map[x][y + i] == target:
+                directions[3] = i
                 break
+
+        # Normalize distances to [0, 1]
+        max_distance: float = max(directions)
+        if max_distance > 0:
+            directions: List[float] = [distance / max_distance for distance in directions]
 
         return directions
 
-    def get_immediate_danger(self, x, y) -> List[int]:
+
+    def get_immediate_danger(self, x, y) -> List[float]:
         collision = ["wall", "snake_body", "snake_head"]
-        danger: List[int] = [0] * 4
+        danger: List[float] = [0] * 4
 
         # Up
         if x < 0 or self.board.map[x - 1][y] in collision:
@@ -221,15 +229,12 @@ class GameManager:
 
         return danger
 
-    def get_state(self, snake: Snake) -> List[int]:
+    def get_state(self, snake: Snake) -> List[float]:
         """
         Get an enhanced state representation for the snake.
 
         Args:
             snake (Snake): The snake to compute the state for.
-
-        Returns:
-            List[float]: The snake's state representation.
         """
         head_x, head_y = snake.head
 
@@ -242,37 +247,21 @@ class GameManager:
         green_apples = self.target_distances(head_x, head_y, "green_apple")
         red_apples = self.target_distances(head_x, head_y, "red_apple")
         walls = self.target_distances(head_x, head_y, "wall")
+        snake_body = self.target_distances(head_x, head_y, "snake_body")
 
         # Immediate danger flags
         immediate_danger = self.get_immediate_danger(head_x, head_y)
 
-        # Combine all features into a single state vector
         return (
             current_direction
-            + green_apples
-            + red_apples
-            + walls
-            + immediate_danger 
             + possible_directions
+            + immediate_danger
+            + green_apples
+            + walls
+            + snake_body
+            + red_apples
         )
+
 
     def reset(self) -> None:
         self.board = GameBoard(config=self.config)
-
-
-
-if __name__ == "__main__":
-    import time
-    fps = 6
-
-    textures = GameTextures(config)
-    game_manager = GameManager(config, textures)
-    key_listener = KeyListener()
-    while True:
-        if key := key_listener.get_key():
-            game_manager.game_controllers[0](int(key))
-        game_manager.update()
-        time.sleep(1 / fps)
-        if not any(snake.alive for snake in game_manager.board.snakes):
-            break
-    key_listener.listener.stop()

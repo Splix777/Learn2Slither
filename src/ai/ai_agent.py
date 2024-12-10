@@ -55,9 +55,9 @@ class AIAgent:
         self.action_size = action_size
         self.epochs = config.neural_network.training.epochs
         self.epsilon = config.neural_network.training.exploration.epsilon
-        self.epsilon_min = config.neural_network.training.exploration.minimum_rate
+        self.epsilon_min = config.neural_network.training.exploration.epsilon_min
         self.epsilon_decay = config.neural_network.training.exploration.decay
-        self.gamma = config.neural_network.training.discount_factor
+        self.gamma = config.neural_network.training.gamma
         self.learning_rate = config.neural_network.training.learning_rate
         # <-- Neural network and optimizer -->
         self.model = DQNSnake(input_size, action_size)

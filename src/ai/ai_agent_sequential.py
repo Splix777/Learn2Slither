@@ -1,21 +1,21 @@
 import random
 import time
-from typing import List
+from typing import Optional
 from collections import deque
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 
 from src.game.game_manager import GameManager
 from src.ui.game_textures import GameTextures
 from src.config.settings import Config, config
 from src.utils.plotter import Plotter
+from src.ai.dqn_snake import DQNSnake
 
 
 class AIAgent:
-    def __init__(self, config: Config, input_size: int, action_size: int, model_path: str = None):
+    def __init__(self, config: Config, input_size: int, action_size: int, model_path: Optional[str] = None):
         """
         Initializes the AI agent for Snake.
         Args:
@@ -29,12 +29,13 @@ class AIAgent:
         self.action_size = action_size
         self.gamma = config.neural_network.training.gamma
         self.batch_size = config.neural_network.training.batch_size
+        self.epochs = config.neural_network.training.epochs
         self.memory = deque(maxlen=100_000)
 
         # Exploration parameters
         self.epsilon = config.neural_network.training.exploration.epsilon
         self.decay = config.neural_network.training.exploration.decay
-        self.epsilon_min = config.neural_network.training.exploration.minimum_rate
+        self.epsilon_min = config.neural_network.training.exploration.epsilon_min
 
         # Models
         self.model = DQNSnake(input_size, action_size)
@@ -45,11 +46,12 @@ class AIAgent:
 
         self.optimizer = optim.Adam(
             self.model.parameters(),
-            lr=config.neural_network.training.learning_rate
+            lr=config.neural_network.training.learning_rate,
+            weight_decay=1e-5
         )
         self.criterion = nn.MSELoss()
 
-    def update_target_model(self):
+    def update_target_model(self) -> None:
         """
         Updates the target model to have the
         same weights as the current model.
@@ -83,28 +85,34 @@ class AIAgent:
         """
         states, actions, rewards, next_states, dones = batch
 
-        # Convert to tensors
-        states = torch.tensor(states, dtype=torch.float)
-        next_states = torch.tensor(next_states, dtype=torch.float)
-        actions = torch.tensor(actions, dtype=torch.long)
-        rewards = torch.tensor(rewards, dtype=torch.float)
-        dones = torch.tensor(dones, dtype=torch.bool)
+        # Convert inputs to tensors
+        state = torch.tensor(states, dtype=torch.float)
+        next_state = torch.tensor(next_states, dtype=torch.float)
+        action = torch.tensor(actions, dtype=torch.long)
+        reward = torch.tensor(rewards, dtype=torch.float)
 
-        # Q-values for the current states
-        q_values = self.model(states)
-        q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+        # Add batch dimension if necessary
+        if len(state.shape) == 1:
+            state = state.unsqueeze(0)
+            next_state = next_state.unsqueeze(0)
+            action = action.unsqueeze(0)
+            reward = reward.unsqueeze(0)
+            dones = (dones,)
 
-        # Q-values for the next states (using target network)
-        next_q_values = self.target_model(next_states).max(1)[0]
-        # No future rewards if the episode is done
-        next_q_values[dones] = 0.0
+        # Get predictions for current state
+        predictions = self.model(state)
+        targets_full = predictions.clone()
 
-        # Compute targets
-        targets = rewards + self.gamma * next_q_values
+        for idx in range(len(dones)):
+            q_new = reward[idx]
+            if not dones[idx]:
+                q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
 
-        # Compute loss and backpropagate
+            targets_full[idx][torch.argmax(action[idx]).item()] = q_new
+
+        # Compute loss
         self.optimizer.zero_grad()
-        loss = self.criterion(q_values, targets)
+        loss = self.criterion(targets_full, predictions)
         loss.backward()
         self.optimizer.step()
 
@@ -115,10 +123,9 @@ class AIAgent:
         if len(self.memory) < batch_size:
             return
         batch = random.sample(self.memory, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
-        self.train_step((states, actions, rewards, next_states, dones))
+        self.train_step(zip(*batch))
 
-    def decay_epsilon(self):
+    def decay_epsilon(self) -> None:
         """
         Decays epsilon after each episode.
         """
@@ -133,10 +140,12 @@ if __name__ == "__main__":
     agent = AIAgent(config=config, input_size=input_size, action_size=4)
 
     record = 0
+    record_time = 0
 
     for epoch in range(agent.epochs):
         game_manager.reset()
         total_reward = 0
+        start_time = time.time()
 
         while True:
             state = game_manager.get_state(game_manager.board.snakes[0])
@@ -151,89 +160,21 @@ if __name__ == "__main__":
 
             total_reward += reward
             if done:
+                longest_time = time.time() - start_time
                 agent.update_target_model()
-                plotter.update(epoch + 1, total_reward, score, agent.epsilon)
+                # plotter.update(epoch + 1, total_reward, score, agent.epsilon)
                 print(
                     f"Episode {epoch + 1}/{agent.epochs}, "
                     f"Total Reward: {total_reward} "
-                    f"Score: {score}, Record: {record}"
+                    f"Score: {score}, Record: {record} "
+                    f"Time: {longest_time:.2f}, Record Time {record_time:.2f}"
                 )
                 if score > record:
                     record = score
                     print(f"New high score: {record}")
+                if longest_time > record_time:
+                    record_time = longest_time
+                    print(f"New longest time: {record_time}")
                 break
 
         time.sleep(0.1)
-
-# if __name__ == "__main__":
-#     textures = GameTextures(config)
-#     game_manager = GameManager(config, textures)
-#     num_snakes = len(game_manager.board.snakes)  # Number of snakes in the game
-
-#     # Initialize agents for each snake
-#     agents = [
-#         AIAgent(
-#             config=config,
-#             input_size=len(game_manager.get_state(snake)),
-#             action_size=4,
-#         )
-#         for snake in game_manager.board.snakes
-#     ]
-
-#     plotter = Plotter()
-#     episodes = 100
-#     batch_size = 32
-#     record = [0] * num_snakes
-
-#     for epoch in range(episodes):
-#         game_manager.reset()
-#         total_rewards = [0] * num_snakes 
-
-#         while True:
-#             states = [
-#                 game_manager.get_state(snake)
-#                 for snake in game_manager.board.snakes
-#             ]
-
-#             actions = [
-#                 agent.act(state) for agent, state in zip(agents, states)
-#             ]
-
-#             rewards, dones, scores = game_manager.step(actions)
-
-#             next_states = [
-#                 game_manager.get_state(snake)
-#                 for snake in game_manager.board.snakes
-#             ]
-
-#             for i, agent in enumerate(agents):
-#                 agent.remember(
-#                     states[i], actions[i], rewards[i], next_states[i], dones[i]
-#                 )
-
-#             for agent in agents:
-#                 if len(agent.memory) >= batch_size:
-#                     agent.replay(batch_size)
-
-#             total_rewards = [r + tr for r, tr in zip(rewards, total_rewards)]
-#             if all(dones):
-#                 for i, agent in enumerate(agents):
-#                     agent.update_target_model()
-
-#                 plotter.update(
-#                     epoch + 1, total_rewards, scores, [agent.epsilon for agent in agents]
-#                 )
-
-#                 for i, score in enumerate(scores):
-#                     print(
-#                         f"Snake {i + 1} - Episode {epoch + 1}/{episodes}, "
-#                         f"Total Reward: {total_rewards[i]} "
-#                         f"Score: {score}, Record: {record[i]}"
-#                     )
-#                     if score > record[i]:
-#                         record[i] = score
-#                         print(f"Snake {i + 1}: New high score: {record[i]}")
-
-#                 break
-
-#         time.sleep(0.1)

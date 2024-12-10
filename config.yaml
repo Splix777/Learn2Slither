@@ -13,10 +13,10 @@ logging:
 
 map:
   board_size:
-    width: 40
+    width: 10
     height: 10
-  green_apples: 16
-  red_apples: 8
+  green_apples: 2
+  red_apples: 1
   snakes: 1
 
 snake:
@@ -96,7 +96,7 @@ rules:
       snake_effect: 1
     red_apple_collision:
       action: shrink 
-      reward: -5
+      reward: 1
       snake_effect: -1
   win_condition:
     condition: max_snake_size
@@ -114,14 +114,14 @@ neural_network:
     optimizer: adam
     loss_function: mse
   training:
-    batch_size: 64
-    epochs: 10_000
+    batch_size: 32
+    epochs: 200
     learning_rate: 0.001
     exploration:
       epsilon: 1.0
-      decay: 0.995
-      epsilon_min: 0.1
-    gamma: 0.9
+      decay: 0.95
+      epsilon_min: 0.0
+    gamma: 0.90
 
 paths:
   models: models

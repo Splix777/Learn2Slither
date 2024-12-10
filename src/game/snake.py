@@ -37,8 +37,8 @@ class Snake:
             self.body.append(snake_segment)
 
     @property
-    def direction_one_hot(self) -> List[int]:
-        mapping = {
+    def direction_one_hot(self) -> List[float]:
+        mapping: dict[Direction, list[float]] = {
             Direction.UP: [1, 0, 0, 0],
             Direction.DOWN: [0, 1, 0, 0],
             Direction.LEFT: [0, 0, 1, 0],
@@ -47,7 +47,7 @@ class Snake:
         return mapping[self.movement_direction]
     
     @property
-    def possible_directions(self) -> List[int]:
+    def possible_directions(self) -> List[float]:
         """Returns possible directions that the snake can move in."""
         # Return a one-hot encoded list of the possible directions.
         return [
