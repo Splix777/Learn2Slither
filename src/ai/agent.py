@@ -1,87 +1,91 @@
-import random
 import time
-from typing import Optional
+import random
+from typing import List, Optional
 from collections import deque
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
 
-from src.game.interpreter import Interpreter
-from src.ui.texture_loader import TextureLoader
-from src.config.settings import Config, config
+from src.game.snake import Snake
 from src.utils.plotter import Plotter
 from src.ai.dqn_snake import DQNSnake
+from src.game.interpreter import Interpreter
+from src.config.settings import Config, config
+from src.ui.texture_loader import TextureLoader
 
 
 class Agent:
-    def __init__(self, config: Config, input_size: int, action_size: int, model_path: Optional[str] = None):
+    def __init__(
+        self,
+        config: Config,
+        interpreter: Interpreter,
+        plotter: Plotter,
+        model_path: Optional[str] = None,
+    ) -> None:
         """
         Initializes the AI agent for Snake.
         Args:
             config (Config): Configuration settings.
-            input_size (int): Input features size.
-            action_size (int): Number of actions.
+            interpreter (Interpreter): Game interpreter.
+            plotter (Plotter): Plotter for visualizing training.
             model_path (str, optional): Path to load pre-trained model.
         """
-        self.config = config
-        self.input_size = input_size
-        self.action_size = action_size
-        self.gamma = config.neural_network.training.gamma
-        self.batch_size = config.neural_network.training.batch_size
-        self.epochs = config.neural_network.training.epochs
-        self.memory = deque(maxlen=100_000)
+        self.config: Config = config
+        self.interpreter: Interpreter = interpreter
+        self.plotter: Plotter = plotter
+        self.gamma: float = config.nn.training.gamma
+        self.batch_size: int = config.nn.training.batch_size
+        self.epochs: int = config.nn.training.epochs
+        self.decay: float = config.nn.training.exploration.decay
+        self.epsilon_min: float = config.nn.training.exploration.epsilon_min
 
-        # Exploration parameters
-        self.epsilon = config.neural_network.training.exploration.epsilon
-        self.decay = config.neural_network.training.exploration.decay
-        self.epsilon_min = config.neural_network.training.exploration.epsilon_min
+        # Initialize separate models and replay buffers for each snake
+        self.snakes_data = [
+            {
+                "model": DQNSnake(interpreter.get_state_size(), 4, config),
+                "goal_model": DQNSnake(interpreter.get_state_size(), 4, config),
+                "memory": deque(maxlen=100_000),
+                "epsilon": config.nn.training.exploration.epsilon,
+            }
+            for _ in range(len(interpreter.board.snakes))
+        ]
 
-        # Models
-        self.model = DQNSnake(input_size, action_size)
-        self.target_model = DQNSnake(input_size, action_size)
+        # Load pre-trained model if provided
         if model_path:
-            self.model.load(model_path)
-        self.update_target_model()
+            for snake_data in self.snakes_data:
+                snake_data["model"].load(model_path)
 
-        self.optimizer = optim.Adam(
-            self.model.parameters(),
-            lr=config.neural_network.training.learning_rate,
-            weight_decay=1e-5
-        )
-        self.criterion = nn.MSELoss()
+        self.update_target_models()
 
-    def update_target_model(self) -> None:
+    def update_target_models(self) -> None:
         """
-        Updates the target model to have the
-        same weights as the current model.
+        Updates the target models for all snakes.
         """
-        self.target_model.load_state_dict(self.model.state_dict())
+        for snake_data in self.snakes_data:
+            snake_data["goal_model"].load_state_dict(snake_data["model"].state_dict())
 
-    def remember(self, state, action, reward, next_state, done) -> None:
+    def remember(self, snake_data, state, action, reward, next_state, done) -> None:
         """
-        Stores an experience in the replay buffer.
+        Stores an experience in the replay buffer for a specific snake.
         """
-        self.memory.append((state, action, reward, next_state, done))
+        snake_data["memory"].append((state, action, reward, next_state, done))
 
-    def act(self, state) -> list[int]:
+    def act(self, state, snake_data) -> list[int]:
         """
-        Chooses an action based on epsilon-greedy strategy.
+        Chooses an action for a specific snake based on epsilon-greedy strategy.
         """
-        movement = [0] * 4
-        self.decay_epsilon()
-        if random.random() < self.epsilon:
-            move = random.randrange(self.action_size)
+        movement: list[int] = [0] * 4
+        if random.random() < snake_data["epsilon"]:
+            move: int = random.randrange(4)
         else:
             state_tensor = torch.tensor(state, dtype=torch.float).unsqueeze(0)
-            q_values = self.model(state_tensor)
+            q_values = snake_data["model"](state_tensor)
             move = int(torch.argmax(q_values).item())
         movement[move] = 1
         return movement
 
-    def train_step(self, batch) -> None:
+    def train_step(self, snake_data, batch) -> None:
         """
-        Performs a training step using a batch of experiences.
+        Performs a training step for a specific snake using a batch of experiences.
         """
         states, actions, rewards, next_states, dones = batch
 
@@ -91,7 +95,6 @@ class Agent:
         action = torch.tensor(actions, dtype=torch.long)
         reward = torch.tensor(rewards, dtype=torch.float)
 
-        # Add batch dimension if necessary
         if len(state.shape) == 1:
             state = state.unsqueeze(0)
             next_state = next_state.unsqueeze(0)
@@ -99,82 +102,90 @@ class Agent:
             reward = reward.unsqueeze(0)
             dones = (dones,)
 
-        # Get predictions for current state
-        predictions = self.model(state)
+        predictions = snake_data["model"](state)
         targets_full = predictions.clone()
 
         for idx in range(len(dones)):
             q_new = reward[idx]
             if not dones[idx]:
-                q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
+                q_new = reward[idx] + self.gamma * torch.max(
+                    snake_data["goal_model"](next_state[idx])
+                )
 
             targets_full[idx][torch.argmax(action[idx]).item()] = q_new
 
-        # Compute loss
-        self.optimizer.zero_grad()
-        loss = self.criterion(targets_full, predictions)
+        snake_data["model"].optimizer.zero_grad()
+        loss = snake_data["model"].criterion(targets_full, predictions)
         loss.backward()
-        self.optimizer.step()
+        snake_data["model"].optimizer.step()
 
-    def replay(self, batch_size) -> None:
+    def replay(self, snake_data) -> None:
         """
-        Samples a batch from memory and trains the model.
+        Samples a batch from the memory of a specific snake and trains its model.
         """
-        if len(self.memory) < batch_size:
+        if len(snake_data["memory"]) < self.batch_size:
             return
-        batch = random.sample(self.memory, batch_size)
-        self.train_step(zip(*batch))
+        batch = random.sample(snake_data["memory"], self.batch_size)
+        self.train_step(snake_data, zip(*batch))
 
-    def decay_epsilon(self) -> None:
+    def decay_epsilon(self, snake_data) -> None:
         """
-        Decays epsilon after each episode.
+        Decays epsilon for a specific snake after each episode.
         """
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay)
+        snake_data["epsilon"] = max(self.epsilon_min, snake_data["epsilon"] * self.decay)
+
+    def train(self) -> None:
+        """
+        Trains the agent using the replay buffers of each snake.
+        """
+
+        for epoch in range(self.epochs):
+            snakes: List[Snake] = self.interpreter.board.snakes
+            self.interpreter.reset()
+            total_reward: float = 0
+            start_time: float = time.time()
+
+            while True:
+                states = [self.interpreter.get_state(snake) for snake in snakes]
+                actions = [
+                    self.act(state, snake_data)
+                    for state, snake_data in zip(states, self.snakes_data)
+                ]
+                print(actions)
+                rewards, dones, scores = self.interpreter.step(actions, snakes)
+                print(f"Rewards: {rewards}, Dones: {dones}, Scores: {scores}")
+
+                next_states = [self.interpreter.get_state(snake) for snake in snakes]
+
+                for i, snake in enumerate(snakes):
+                    snake_data = self.snakes_data[i]
+                    self.remember(
+                        snake_data, states[i], actions[i], rewards[i], next_states[i], dones[i]
+                    )
+                    if len(snake_data["memory"]) >= self.batch_size:
+                        self.replay(snake_data)
+
+                total_reward += sum(rewards)
+                for snake in snakes:
+                    if not snake.alive:
+                        snakes.remove(snake)
+                if all(dones):
+                    for snake_data in self.snakes_data:
+                        self.decay_epsilon(snake_data)
+                    break
+                # time.sleep(.1)
+
+            duration = time.time() - start_time
+            print(f"Epoch {epoch + 1}/{self.epochs}, Reward: {total_reward}, Time: {duration:.2f}s")
 
 
 if __name__ == "__main__":
     textures = TextureLoader(config)
     interpreter = Interpreter(config, textures)
     plotter = Plotter()
-    input_size: int = len(interpreter.get_state(interpreter.board.snakes[0]))
-    agent = Agent(config=config, input_size=input_size, action_size=4)
-
-    record = 0
-    record_time = 0
-
-    for epoch in range(agent.epochs):
-        interpreter.reset()
-        total_reward = 0
-        start_time = time.time()
-
-        while True:
-            state = interpreter.get_state(interpreter.board.snakes[0])
-            action = agent.act(state)
-            reward, done, score = interpreter.step(action)
-            next_state = interpreter.get_state(interpreter.board.snakes[0])
-
-            agent.remember(state, action, reward, next_state, done)
-
-            if len(agent.memory) >= agent.batch_size:
-                agent.replay(agent.batch_size)
-
-            total_reward += reward
-            if done:
-                longest_time = time.time() - start_time
-                agent.update_target_model()
-                # plotter.update(epoch + 1, total_reward, score, agent.epsilon)
-                print(
-                    f"Episode {epoch + 1}/{agent.epochs}, "
-                    f"Total Reward: {total_reward} "
-                    f"Score: {score}, Record: {record} "
-                    f"Time: {longest_time:.2f}, Record Time {record_time:.2f}"
-                )
-                if score > record:
-                    record = score
-                    print(f"New high score: {record}")
-                if longest_time > record_time:
-                    record_time = longest_time
-                    print(f"New longest time: {record_time}")
-                break
-
-        time.sleep(0.1)
+    agent = Agent(
+        config=config,
+        interpreter=interpreter,
+        plotter=plotter,
+    )
+    agent.train()

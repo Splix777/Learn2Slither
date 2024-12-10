@@ -115,7 +115,7 @@ class Enviroment:
         if self._collided_with_snake(snake=snake, snakes=snakes):
             self._delete_snake(snake=snake)
             return True
-        return False
+        return not snake.alive
 
     def _collided_with_wall(self, snake: Snake) -> bool:
         """
@@ -158,7 +158,7 @@ class Enviroment:
         """
         for segment in range(1, len(snake.body)):
             self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
-        # self.snakes.remove(snake)
+        snake.alive = False
 
     # <-- Game state update methods -->
     def check_apple_eaten(self, snake: Snake) -> str | None:

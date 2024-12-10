@@ -63,9 +63,6 @@ class SnakeConfig(BaseModel):
         lt=10,
         description="Starting size must be greater than 0 and less than 10",
     )
-    ai_vision: int
-    player_colors: List[str]
-    ai_colors: List[str]
     max_speed: int
 
 
@@ -145,27 +142,6 @@ class RulesConfig(BaseModel):
     win_condition: WinConditionsConfig
 
 
-class LayerConfig(BaseModel):
-    """Layer configuration model."""
-    input_size: int
-    hidden: List[int]
-    output_size: int
-
-
-class ActivationConfig(BaseModel):
-    """Activation function configuration model."""
-    function: Literal["relu", "lrelu", "tanh", "sigmoid", "softmax"]
-    output_function: Literal["sigmoid", "softmax"]
-
-
-class ArchitectureConfig(BaseModel):
-    """Architecture configuration model."""
-    layers: LayerConfig
-    activation_function: ActivationConfig
-    optimizer: Literal["adam", "sgd", "rmsprop"]
-    loss_function: Literal["mse", "mae", "categorical_crossentropy"]
-
-
 class ExplorationConfig(BaseModel):
     """Exploration configuration model."""
     epsilon: float
@@ -184,7 +160,6 @@ class TrainingConfig(BaseModel):
 
 class NeuralNetworkConfig(BaseModel):
     """Neural network configuration model."""
-    architecture: ArchitectureConfig
     training: TrainingConfig
 
 
@@ -206,7 +181,7 @@ class Config(BaseModel):
     ascii: ASCIIConfig
     pygame_textures: PyGameTextures
     rules: RulesConfig
-    neural_network: NeuralNetworkConfig
+    nn: NeuralNetworkConfig
     paths: PathsConfig
 
     @model_validator(mode="after")

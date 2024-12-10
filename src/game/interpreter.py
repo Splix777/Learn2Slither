@@ -54,65 +54,58 @@ class Interpreter:
         self.board.add_apples()
         for snake in self.board.snakes:
             self.board.move_snake(snake=snake)
-            if self.board.check_collision(snake=snake, snakes=self.board.snakes):
+            if self.board.check_collision(
+                snake=snake, snakes=self.board.snakes
+            ):
                 snake.alive = False
             self.board.check_apple_eaten(snake)
             self.board.update_snake_position(snake)
 
         self.render()
 
-    def step(self, action: list[int]) -> Tuple[float, bool, int]:
+    def step(self, actions: List[list[int]], snakes: List[Snake]):
         """
         Perform one step in the game based on the chosen action,
         then return the new state, reward, and done flag.
 
         Args:
-            action (int): The action chosen by the agent
+            actions (List[list[int]]): Actions chosen by the agents
                 (0: up, 1: down, 2: left, 3: right).
+            snakes (List[Snake]): List of snake objects for the agents.
 
         Returns:
-            Tuple[List[int], float, bool]: The next state,
-                the reward, and whether the game is done.
+            Tuple[List[int], List[bool], List[int]]: The rewards, done flags, 
+                and sizes of all snakes.
         """
-        snake = self.board.snakes[0]
-        snake.snake_controller(action)
-        
-        done = False
-        reward = 0
+        rewards: List[int] = [0] * len(snakes)
+        dones: List[bool] = [False] * len(snakes)
 
-        # self.update()
-        self.board.move_snake(snake=snake)
-        if self.board.check_collision(snake=snake, snakes=self.board.snakes):
-            snake.alive = False
-            reward = self.config.rules.collisions.wall_collision.reward
-            return reward, True, snake.size
-        if apple := self.board.check_apple_eaten(snake):
+        # Apply actions and update the board
+        for i, (snake, action) in enumerate(zip(snakes, actions)):
+            snake.snake_controller(action)  # Control snake based on action
+            self.board.move_snake(snake)   # Move the snake on the board
+
+            # Check for apple collisions
+            apple = self.board.check_apple_eaten(snake)
             if apple == "green_apple":
-                reward: int = self.config.rules.collisions.green_apple_collision.reward
+                rewards[i] += self.config.rules.collisions.green_apple_collision.reward
             elif apple == "red_apple":
-                reward: int = self.config.rules.collisions.red_apple_collision.reward
-            if not snake.alive:
-                reward: int = self.config.rules.collisions.snake_kill.reward
-                return reward, True, snake.size
-            
-        self.board.update_snake_position(snake)
+                rewards[i] += self.config.rules.collisions.red_apple_collision.reward
+
+            # Check for wall or snake collisions
+            if self.board.check_collision(snake, snakes):
+                rewards[i] += self.config.rules.collisions.wall_collision.reward
+                dones[i] = True  # Snake is done (e.g., collided)
+
+        [self.board.update_snake_position(snake) for snake in snakes]
+
+        # Add new apples to the board after all movements
         self.board.add_apples()
 
+        # Render the updated board
         self.render()
 
-        # if not snake.alive:
-        #     done = True
-        #     reward: int = self.config.rules.collisions.wall_collision.reward
-        #     return reward, done, snake.size
-
-        # for _ in range(snake.green_apples_eaten):
-        #     reward = self.config.rules.collisions.green_apple_collision.reward
-        # for _ in range(snake.red_apples_eaten):
-        #     reward = self.config.rules.collisions.red_apple_collision.reward
-        # for _ in range(snake.kills):
-        #     reward = self.config.rules.collisions.snake_kill.reward
-
-        return reward, done, snake.size
+        return rewards, dones, [snake.size for snake in snakes]
 
     def render_ascii(self) -> None:
         if not self.console:
@@ -166,7 +159,8 @@ class Interpreter:
 
     def target_distances(self, x: int, y: int, target: str) -> List[float]:
         """
-        Calculate the distance to the nearest target object in each cardinal direction.
+        Calculate the distance to the nearest target object in
+        each cardinal direction.
 
         Args:
             x (int): Snake's head x-coordinate.
@@ -174,7 +168,8 @@ class Interpreter:
             target (str): Target object type (e.g., "green_apple").
 
         Returns:
-            List[float]: Distances to the target object in [up, down, left, right], scaled to [0, 1].
+            List[float]: Distances to the target object in
+                [up, down, left, right], scaled to [0, 1].
         """
         directions = [0] * 4
 
@@ -205,10 +200,11 @@ class Interpreter:
         # Normalize distances to [0, 1]
         max_distance: float = max(directions)
         if max_distance > 0:
-            directions: List[float] = [distance / max_distance for distance in directions]
+            directions: List[float] = [
+                distance / max_distance for distance in directions
+            ]
 
         return directions
-
 
     def get_immediate_danger(self, x, y) -> List[float]:
         collision = ["wall", "snake_body", "snake_head"]
@@ -218,7 +214,10 @@ class Interpreter:
         if x < 0 or self.board.map[x - 1][y] in collision:
             danger[0] = 1
         # Down
-        if x + 1 >= self.board.height or self.board.map[x + 1][y] in collision:
+        if (
+            x + 1 >= self.board.height
+            or self.board.map[x + 1][y] in collision
+        ):
             danger[1] = 1
         # Left
         if y < 0 or self.board.map[x][y - 1] in collision:
@@ -262,6 +261,12 @@ class Interpreter:
             + red_apples
         )
 
+    def get_state_size(self) -> int:
+        return (
+            len(self.get_state(self.board.snakes[0]))
+            if self.board.snakes
+            else 0
+        )
 
     def reset(self) -> None:
         self.board = Enviroment(config=self.config)
