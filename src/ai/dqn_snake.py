@@ -26,6 +26,7 @@ class DQNSnake(nn.Module):
         self.optimizer = torch.optim.Adam(
             self.parameters(),
             lr=config.nn.training.learning_rate,
+            amsgrad=True,
             weight_decay=1e-5
         )
         self.criterion = nn.MSELoss()

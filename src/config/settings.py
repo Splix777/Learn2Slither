@@ -113,19 +113,11 @@ class PyGameTextures(BaseModel):
     empty: ThemedTextures
 
 
-class CollisionEffects(BaseModel):
-    """Collision effects configuration model."""
-    action: Literal["death", "grow", "shrink"]
-    reward: int
-    snake_effect: int
-
-
 class Collisions(BaseModel):
     """Collisions configuration model."""
-    snake_kill: CollisionEffects
-    wall_collision: CollisionEffects
-    green_apple_collision: CollisionEffects
-    red_apple_collision: CollisionEffects
+    death: int
+    green_apple: int
+    red_apple: int
 
 
 class WinConditionsConfig(BaseModel):
@@ -138,7 +130,7 @@ class WinConditionsConfig(BaseModel):
 
 class RulesConfig(BaseModel):
     """Rules configuration model."""
-    collisions: Collisions
+    events: Collisions
     win_condition: WinConditionsConfig
 
 

@@ -46,7 +46,7 @@ class Interpreter:
         else:
             pygame.init()
             self.window = pygame.display.set_mode(
-                size=(self.board.width * 20, self.board.height * 20)
+                size=(self.board.width * 32, self.board.height * 32)
             )
             self.render: Callable = self.render_pygame
 
@@ -88,13 +88,13 @@ class Interpreter:
             # Check for apple collisions
             apple = self.board.check_apple_eaten(snake)
             if apple == "green_apple":
-                rewards[i] += self.config.rules.collisions.green_apple_collision.reward
+                rewards[i] += self.config.rules.events.green_apple
             elif apple == "red_apple":
-                rewards[i] += self.config.rules.collisions.red_apple_collision.reward
+                rewards[i] += self.config.rules.events.red_apple
 
             # Check for wall or snake collisions
             if self.board.check_collision(snake, snakes):
-                rewards[i] += self.config.rules.collisions.wall_collision.reward
+                rewards[i] += self.config.rules.events.death
                 dones[i] = True  # Snake is done (e.g., collided)
 
         [self.board.update_snake_position(snake) for snake in snakes]
@@ -135,7 +135,7 @@ class Interpreter:
                 texture: pygame.Surface = pygame.image.load(
                     str(self.textures.textures[cell])
                 )
-                self.window.blit(texture, (col_num * 20, row_num * 20))
+                self.window.blit(texture, (col_num * 32, row_num * 32))
 
         score_positions = [
             (0, 0),
@@ -240,7 +240,7 @@ class Interpreter:
         # Snake's current direction as one-hot encoding
         current_direction = snake.direction_one_hot
         # Possible direction based on current direction
-        possible_directions = snake.possible_directions
+        possible_directions = snake.possible_directions_one_hot
 
         # Distances to nearest apples and walls in each cardinal direction
         green_apples = self.target_distances(head_x, head_y, "green_apple")

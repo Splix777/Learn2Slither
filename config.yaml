@@ -15,9 +15,9 @@ map:
   board_size:
     width: 20
     height: 20
-  green_apples: 10
-  red_apples: 2
-  snakes: 4
+  green_apples: 2
+  red_apples: 1
+  snakes: 2
 
 snake:
   start_color: blue
@@ -54,42 +54,29 @@ ascii:
 
 pygame_textures:
   wall:
-    dark: wall/wall_dark.png
+    dark: wall/wall_block_32_0.png
     light: wall/wall_light.png
   snake_head:
-    dark: snake_head/snake_head_dark.png
+    dark: snake_head/snake_green_head_32.png
     light: snake_head/snake_head_light.png
   snake_body:
-    dark: snake_body/snake_body_dark.png
+    dark: snake_body/snake_green_blob_32.png
     light: snake_body/snake_body_light.png
   green_apple:
-    dark: green_apple/green_apple_dark.png
+    dark: green_apple/apple_green_32.png
     light: green_apple/green_apple_light.png
   red_apple:
-    dark: red_apple/red_apple_dark.png
+    dark: red_apple/apple_red_32.png
     light: red_apple/red_apple_light.png
   empty:
     dark: empty/empty_dark.png
     light: empty/empty_light.png
 
 rules:
-  collisions:
-    snake_kill:
-      action: death
-      reward: 10
-      snake_effect: 0
-    wall_collision:
-      action: death
-      reward: -10
-      snake_effect: 0
-    green_apple_collision:
-      action: grow
-      reward: 10
-      snake_effect: 1
-    red_apple_collision:
-      action: shrink 
-      reward: -5
-      snake_effect: -1
+  events:
+    death: -10
+    green_apple: 10
+    red_apple: -5
   win_condition:
     condition: max_snake_size
     max_score: 1
@@ -102,7 +89,7 @@ nn:
     exploration:
       epsilon: 1.0
       decay: 0.95
-      epsilon_min: 0.0
+      epsilon_min: 0.05
     gamma: 0.90
     
 paths:

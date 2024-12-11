@@ -151,9 +151,7 @@ class Agent:
                     self.act(state, snake_data)
                     for state, snake_data in zip(states, self.snakes_data)
                 ]
-                print(actions)
                 rewards, dones, scores = self.interpreter.step(actions, snakes)
-                print(f"Rewards: {rewards}, Dones: {dones}, Scores: {scores}")
 
                 next_states = [self.interpreter.get_state(snake) for snake in snakes]
 
