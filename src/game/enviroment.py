@@ -82,6 +82,16 @@ class Enviroment:
             ):
                 game_map[row][col] = "wall"
 
+    def reset(self) -> None:
+        """
+        Reset the game environment.
+        """
+        self.map = self.make_map()
+        self.snakes = self.create_snakes(self.config.snake.start_size)
+        self.current_red_apples = 0
+        self.current_green_apples = 0
+        self.add_apples()
+
     # <-- Utility methods -->
     def get_random_empty_coordinate(self) -> Tuple[int, int]:
         """

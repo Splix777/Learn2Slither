@@ -1,196 +1,154 @@
-import time
-import random
-from typing import List, Optional
-from collections import deque
+"""Deep Q-Network for the Snake AI."""
 
 import torch
+import torch.nn as nn
+from pathlib import Path
 
-from src.game.snake import Snake
-from src.utils.plotter import Plotter
-from src.ai.dqn_snake import DQNSnake
-from src.game.interpreter import Interpreter
-from src.config.settings import Config, config
-from src.ui.texture_loader import TextureLoader
+from src.config.settings import Config
 
 
-class Agent:
-    def __init__(
-        self,
-        config: Config,
-        interpreter: Interpreter,
-        plotter: Plotter,
-        model_path: Optional[str] = None,
-    ) -> None:
+class DeepQSnakeAgent(nn.Module):
+    def __init__(self, input_size: int, output_size: int, config: Config):
         """
-        Initializes the AI agent for Snake.
+        A deep Q-network for the Snake AI.
+
         Args:
-            config (Config): Configuration settings.
-            interpreter (Interpreter): Game interpreter.
-            plotter (Plotter): Plotter for visualizing training.
-            model_path (str, optional): Path to load pre-trained model.
+            input_size (int): The size of the input state.
+            output_size (int): The number of possible actions.
+            config (Config): The configuration settings.
         """
-        self.config: Config = config
-        self.interpreter: Interpreter = interpreter
-        self.plotter: Plotter = plotter
-        self.gamma: float = config.nn.training.gamma
-        self.batch_size: int = config.nn.training.batch_size
-        self.epochs: int = config.nn.training.epochs
-        self.decay: float = config.nn.training.exploration.decay
-        self.epsilon_min: float = config.nn.training.exploration.epsilon_min
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.LeakyReLU(0.01),
+            nn.Linear(128, output_size),
+        )
+        self.optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=config.nn.training.learning_rate,
+            amsgrad=True,
+            weight_decay=1e-5
+        )
+        self.criterion = nn.MSELoss()
+        self.device = torch.device(
+            "cuda"
+            if torch.cuda.is_available() 
+            else "cpu"
+        )
+        self.to(self.device)
 
-        # Initialize separate models and replay buffers for each snake
-        self.snakes_data = [
-            {
-                "model": DQNSnake(interpreter.get_state_size(), 4, config),
-                "goal_model": DQNSnake(interpreter.get_state_size(), 4, config),
-                "memory": deque(maxlen=100_000),
-                "epsilon": config.nn.training.exploration.epsilon,
-            }
-            for _ in range(len(interpreter.board.snakes))
-        ]
-
-        # Load pre-trained model if provided
-        if model_path:
-            for snake_data in self.snakes_data:
-                snake_data["model"].load(model_path)
-
-        self.update_target_models()
-
-    def update_target_models(self) -> None:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Updates the target models for all snakes.
+        Forward pass for the network.
+
+        Args:
+            x (torch.Tensor): A batch of game states for the Snake game.
+
+        Returns:
+            torch.Tensor: Output tensor representing Q-values
+                for each action.
         """
-        for snake_data in self.snakes_data:
-            snake_data["goal_model"].load_state_dict(snake_data["model"].state_dict())
+        return self.model(x.to(self.device))
 
-    def remember(self, snake_data, state, action, reward, next_state, done) -> None:
+    def save(self, path: str | Path) -> None:
         """
-        Stores an experience in the replay buffer for a specific snake.
+        Save the model's state dictionary to a specified file.
+
+        Args:
+            path (Union[str, Path]): The file path where the model
+                will be saved.
         """
-        snake_data["memory"].append((state, action, reward, next_state, done))
+        path = Path(path)
+        torch.save(self.state_dict(), path)
 
-    def act(self, state, snake_data) -> list[int]:
+    def load(self, path: str | Path) -> None:
         """
-        Chooses an action for a specific snake based on epsilon-greedy strategy.
+        Load the model weights from a specified file.
+
+        Args:
+            path (Union[str, Path]): Path to the saved model file.
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist.
         """
-        movement: list[int] = [0] * 4
-        if random.random() < snake_data["epsilon"]:
-            move: int = random.randrange(4)
-        else:
-            state_tensor = torch.tensor(state, dtype=torch.float).unsqueeze(0)
-            q_values = snake_data["model"](state_tensor)
-            move = int(torch.argmax(q_values).item())
-        movement[move] = 1
-        return movement
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Model file not found at {path}")
 
-    def train_step(self, snake_data, batch) -> None:
-        """
-        Performs a training step for a specific snake using a batch of experiences.
-        """
-        states, actions, rewards, next_states, dones = batch
+        try:
+            self.load_state_dict(
+                torch.load(path, map_location=self.device)
+            )
+            self.to(self.device)
+            print(f"Model loaded from {path}")
 
-        # Convert inputs to tensors
-        state = torch.tensor(states, dtype=torch.float)
-        next_state = torch.tensor(next_states, dtype=torch.float)
-        action = torch.tensor(actions, dtype=torch.long)
-        reward = torch.tensor(rewards, dtype=torch.float)
+        except Exception as e:
+            raise RuntimeError(f"Error loading model from {path}: {e}") from e
 
-        if len(state.shape) == 1:
-            state = state.unsqueeze(0)
-            next_state = next_state.unsqueeze(0)
-            action = action.unsqueeze(0)
-            reward = reward.unsqueeze(0)
-            dones = (dones,)
+"""
+What is Q-Learning?
 
-        predictions = snake_data["model"](state)
-        targets_full = predictions.clone()
+Q-learning is a decision-making framework where an agent learns to
+choose the best actions to maximize rewards over time. The goal is to
+build a "map" of the best actions for every situation (state).
 
-        for idx in range(len(dones)):
-            q_new = reward[idx]
-            if not dones[idx]:
-                q_new = reward[idx] + self.gamma * torch.max(
-                    snake_data["goal_model"](next_state[idx])
-                )
+The key concept in Q-learning is the Q-value:
+    - Q(state, action) is a value that represents the "quality" of
+        taking a specific action in a specific state.
+    - The agent uses these Q-values to make decisions, aiming to pick
+        actions with the highest Q-value.
 
-            targets_full[idx][torch.argmax(action[idx]).item()] = q_new
+The Q-value is updated using the Bellman equation:
+    Q(s, a) = r + γ * max(Q(s', a'))
+    - Q(s, a) is the Q-value for state s and action a.
+    - r is the immediate reward for taking action a in state s.
+    - γ is the discount factor for future rewards.
+    - max(Q(s', a')) is the maximum Q-value for the next state s' and
+        all possible actions a'.
 
-        snake_data["model"].optimizer.zero_grad()
-        loss = snake_data["model"].criterion(targets_full, predictions)
-        loss.backward()
-        snake_data["model"].optimizer.step()
+----
+        
+What is a Q-Network?
 
-    def replay(self, snake_data) -> None:
-        """
-        Samples a batch from the memory of a specific snake and trains its model.
-        """
-        if len(snake_data["memory"]) < self.batch_size:
-            return
-        batch = random.sample(snake_data["memory"], self.batch_size)
-        self.train_step(snake_data, zip(*batch))
+A Q-network is a neural network that approximates the Q-table when the
+problem is too large or complex to store every possible state-action
+pair explicitly.
 
-    def decay_epsilon(self, snake_data) -> None:
-        """
-        Decays epsilon for a specific snake after each episode.
-        """
-        snake_data["epsilon"] = max(self.epsilon_min, snake_data["epsilon"] * self.decay)
+We use a deep Q-network (DQN) to approximate the Q-values for the Snake
+game. The network takes the game state as input and outputs Q-values for
+each possible action. The agent uses these Q-values to choose the best
+action to take.
 
-    def train(self) -> None:
-        """
-        Trains the agent using the replay buffers of each snake.
-        """
-        best_score: int = 0
-        best_time: float = 0
+Analogy:
 
-        for epoch in range(self.epochs):
-            self.interpreter.reset()
-            total_reward: float = 0
-            start_time: float = time.time()
+Imagine the city becomes so large that you cant memorize every street
+and its reward. Instead, you learn to recognize patterns:
+    - Busy streets during rush hour are slow (low Q-value).
+    - Shortcuts throught quiet neighborhoods are fast (high Q-value).
+    - Certain landmarks mean a fast route is ahead (high Q-value).
 
-            while True:
-                states = self.interpreter.board.snake_states
-                actions = [self.act(state, snake_data) for state, snake_data in zip(states, self.snakes_data)]
-                rewards, dones, scores = self.interpreter.board.step(actions)
-                next_states = self.interpreter.board.snake_states
+You replace your mental map with a neural network that learns these
+patterns from experience. The network takes the current location as
+input and outputs the best direction to take.
 
-                for i, snake in enumerate(self.interpreter.board.snakes):
-                    snake_data = self.snakes_data[i]
-                    self.remember(snake_data, states[i], actions[i], rewards[i], next_states[i], dones[i])
-                    if len(snake_data["memory"]) >= self.batch_size:
-                        self.replay(snake_data)
+----
 
-                total_reward += sum(rewards)
-                for snake in self.interpreter.board.snakes:
-                    if not snake.alive:
-                        self.interpreter.board.snakes.remove(snake)
-                self.interpreter.render()
-                if all(dones):
-                    for snake_data in self.snakes_data:
-                        self.decay_epsilon(snake_data)
-                    for score in scores:
-                        if score > best_score:
-                            best_score = score
-                    if time.time() - start_time > best_time:
-                        best_time = time.time() - start_time
-                    print(
-                        f"Epoch {epoch + 1}/{self.epochs}, "
-                        f"Score: {scores}, "
-                        f"Best Score: {best_score}, "
-                        f"Best Time: {best_time:.2f}s"
-                    )
-                    break
-                # time.sleep(.1)
+How is a Q-Network Different from a Regular Neural Network?
 
-            duration = time.time() - start_time
-            print(f"Epoch {epoch + 1}/{self.epochs}, Reward: {total_reward}, Time: {duration:.2f}s")
+Supervised vs Reinforcement Learning
+
+Supervised Learning:
+    Regular neural networks learn from labeled data. The network
+    adjusts its weights to minimize the difference between its
+    predictions and the true labels.
+
+Reinforcement Learning:
+    Q-networks learn from rewards and punishments. The network
+    adjusts its weights to maximize the expected rewards over time.
 
 
-if __name__ == "__main__":
-    textures = TextureLoader(config)
-    interpreter = Interpreter(config, textures)
-    plotter = Plotter()
-    agent = Agent(
-        config=config,
-        interpreter=interpreter,
-        plotter=plotter,
-    )
-    agent.train()
+TL:DR
+Q-Networks serve as 'smart-maps' for agents to navigate complex
+environments. They approximate Q-values to make decisions that
+maximize rewards over time.
+"""

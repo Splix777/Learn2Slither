@@ -13,10 +13,10 @@ logging:
 
 map:
   board_size:
-    width: 40
-    height: 40
-  green_apples: 8
-  red_apples: 4
+    width: 10
+    height: 10
+  green_apples: 2
+  red_apples: 1
   snakes: 1
 
 snake:
@@ -39,7 +39,7 @@ visual:
       - team
   speed: normal
   themes:
-    default_theme: light
+    default_theme: dark
     available_themes:
       - light
       - dark
@@ -71,6 +71,7 @@ pygame_textures:
   empty:
     dark: empty/empty_dark.png
     light: empty/empty_light.png
+  texture_size: 32
 
 rules:
   events:
@@ -84,7 +85,7 @@ rules:
 nn:
   training:
     batch_size: 32
-    epochs: 200
+    epochs: 100
     learning_rate: 0.001
     exploration:
       epsilon: 0.99

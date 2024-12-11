@@ -111,6 +111,7 @@ class PyGameTextures(BaseModel):
     green_apple: ThemedTextures
     red_apple: ThemedTextures
     empty: ThemedTextures
+    texture_size: int
 
 
 class Collisions(BaseModel):
