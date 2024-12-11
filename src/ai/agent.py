@@ -77,7 +77,7 @@ class DeepQSnakeAgent(nn.Module):
 
         try:
             self.load_state_dict(
-                torch.load(path, map_location=self.device)
+                torch.load(path, map_location=self.device, weights_only=True)
             )
             self.to(self.device)
             print(f"Model loaded from {path}")

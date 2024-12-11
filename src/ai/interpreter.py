@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 import random
 from typing import Optional
@@ -19,7 +20,7 @@ class Interpreter:
         env: Enviroment,
         plotter: Plotter,
         gui: Optional[GUI] = None,
-        model_path: Optional[str] = None,
+        model_path: Optional[Path] = None,
     ) -> None:
         """
         Initializes the AI agent for Snake.
@@ -169,6 +170,9 @@ class Interpreter:
                         self.decay_epsilon(snake_data)
                     for score in scores:
                         if score > best_score:
+                            # Save the best model
+                            for i, snake_data in enumerate(self.snakes_data):
+                                snake_data["model"].save(config.paths.models / f"snake_{i}_best.pth")
                             best_score = score
                     if time.time() - start_time > best_time:
                         best_time = time.time() - start_time
@@ -179,20 +183,50 @@ class Interpreter:
                         f"Best Time: {best_time:.2f}s"
                     )
                     break
-                time.sleep(.1)
+                # time.sleep(.1)
 
             duration = time.time() - start_time
             print(f"Epoch {epoch + 1}/{self.epochs}, Reward: {total_reward}, Time: {duration:.2f}s")
+
+    def evaluate(self) -> None:
+        """
+        Evaluates the agent's performance over multiple episodes.
+        Makes the agent play without training.
+        """
+        while True:
+            self.env.reset()
+            total_reward: float = 0
+            start_time: float = time.time()
+
+            while True:
+                states = self.env.snake_states
+                actions = [self.act(state, snake_data) for state, snake_data in zip(states, self.snakes_data)]
+                rewards, dones, _ = self.env.step(actions)
+                total_reward += sum(rewards)
+
+                if self.gui:
+                    self.gui.render(self.env)
+
+                if all(dones):
+                    break
+                time.sleep(.1)
+
+            duration = time.time() - start_time
+            print(f"Reward: {total_reward}, Time: {duration:.2f}s")
+
+
 
 
 if __name__ == "__main__":
     gui = GUI(config)
     env = Enviroment(config)
     plotter = Plotter()
+    saved_model: Path = config.paths.models / "snake_0_best.pth"
     interpreter = Interpreter(
         config=config,
         gui=gui,
         env=env,
         plotter=plotter,
+        model_path=saved_model
     )
-    interpreter.train()
+    interpreter.evaluate()

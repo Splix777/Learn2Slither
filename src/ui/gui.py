@@ -3,7 +3,6 @@
 from typing import Callable, Optional, Dict
 
 import pygame
-
 from rich.text import Text
 from rich.console import Console
 
