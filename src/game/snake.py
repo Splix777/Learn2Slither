@@ -24,6 +24,10 @@ class Snake:
         self.movement_direction: Direction = start_dir
         self.initialize()
 
+    def __repr__(self) -> str:
+        """Return the snake's representation."""
+        return f"Snake {self.id} - Size: {self.size} - Alive: {self.alive}"
+
     def initialize(self) -> None:
         """Initialize the snake body."""
         for body in range(1, self.size):
@@ -37,16 +41,7 @@ class Snake:
             )
             self.body.append(snake_segment)
 
-    @property
-    def direction_one_hot(self) -> List[int]:
-        """One-hot representation of snake's movement."""
-        return Direction.one_hot(self.movement_direction)
-
-    @property
-    def possible_directions_one_hot(self) -> List[int]:
-        """One-hot representation of snake's possible movement."""
-        return Direction.possible_directions(self.movement_direction)
-    
+    # <-- Movement methods -->
     def snake_controller(self, direction: List[int] | int) -> None:
         """
         Change the snake's movement direction. Suppresses ValueError
@@ -87,6 +82,7 @@ class Snake:
 
         return removed_tails
 
+    # <-- Size methods -->
     def grow(self) -> None:
         """Increase the snake's size by one."""
         self.size += 1
@@ -97,6 +93,7 @@ class Snake:
         if self.size == 0:
             self.alive = False
 
+    # <-- Reward methods -->
     def reset_reward(self) -> None:
         """Reset the snake's reward."""
         self.reward = 0
@@ -111,3 +108,14 @@ class Snake:
         """
         if event in {"death", "green_apple", "red_apple"}:
             self.reward = reward
+
+    # <-- Properties -->
+    @property
+    def direction_one_hot(self) -> List[int]:
+        """One-hot representation of snake's movement."""
+        return Direction.one_hot(self.movement_direction)
+
+    @property
+    def possible_directions_one_hot(self) -> List[int]:
+        """One-hot representation of snake's possible movement."""
+        return Direction.possible_directions(self.movement_direction)

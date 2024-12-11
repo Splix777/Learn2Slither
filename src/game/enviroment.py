@@ -26,6 +26,9 @@ class Enviroment:
         self.snakes: List[Snake] = self.create_snakes(config.snake.start_size)
         self.add_apples()
 
+    def __repr__(self) -> str:
+        return f"Enviroment - Height: {self.height} - Width: {self.width}"
+
     # <-- Map generation methods -->
     def make_map(self) -> List[List[str]]:
         """Create a map with the given configuration."""
@@ -229,14 +232,14 @@ class Enviroment:
         for space in empty_spaces:
             self.map[space[0]][space[1]] = "empty"
 
-    def iterate_snakes(self, actions: List[List[int]] | List[int]) -> None:
+    def step(self, actions: List[List[int]] | List[int]):
         """Perform one step in the game based on the chosen action."""
         [snake.reset_reward() for snake in self.snakes]
         for snake, action in zip(self.snakes, actions):
             snake.snake_controller(action)
             self.move_snake(snake)
-            collision_event = self.check_collision(snake, self.snakes)
             apple_event = self.check_apple_eaten(snake)
+            collision_event = self.check_collision(snake, self.snakes)
             if collision_event or apple_event:
                 self._update_snake_rewards(
                     snake,
@@ -245,14 +248,139 @@ class Enviroment:
 
         self.add_apples()
 
+        return self.rewards, self.snakes_done, self.snake_sizes
+
+    # <-- Snake States -->
+    def get_state(self, snake: Snake) -> List[float]:
+        """
+        Get an enhanced state representation for the snake.
+
+        Args:
+            snake (Snake): The snake to compute the state for.
+        """
+        head_x, head_y = snake.head
+
+        # Snake's current direction as one-hot encoding
+        current_direction = snake.direction_one_hot
+        # Possible direction based on current direction
+        possible_directions = snake.possible_directions_one_hot
+
+        # Distances to nearest apples and walls in each cardinal direction
+        green_apples = self.target_distances(head_x, head_y, "green_apple")
+        red_apples = self.target_distances(head_x, head_y, "red_apple")
+        walls = self.target_distances(head_x, head_y, "wall")
+        snake_body = self.target_distances(head_x, head_y, "snake_body")
+
+        # Immediate danger flags
+        immediate_danger = self.get_immediate_danger(head_x, head_y)
+
+        return (
+            current_direction
+            + possible_directions
+            + immediate_danger
+            + green_apples
+            + walls
+            + snake_body
+            + red_apples
+        )
+
+    def target_distances(self, x: int, y: int, target: str) -> List[float]:
+        """
+        Calculate the distance to the nearest target object in
+        each cardinal direction.
+
+        Args:
+            x (int): Snake's head x-coordinate.
+            y (int): Snake's head y-coordinate.
+            target (str): Target object type (e.g., "green_apple").
+
+        Returns:
+            List[float]: Distances to the target object in
+                [up, down, left, right], scaled to [0, 1].
+        """
+        directions = [0] * 4
+
+        # Up
+        for i in range(1, x + 1):
+            if self.map[x - i][y] == target:
+                directions[0] = i
+                break
+
+        # Down
+        for i in range(1, self.height - x):
+            if self.map[x + i][y] == target:
+                directions[1] = i
+                break
+
+        # Left
+        for i in range(1, y + 1):
+            if self.map[x][y - i] == target:
+                directions[2] = i
+                break
+
+        # Right
+        for i in range(1, self.width - y):
+            if self.map[x][y + i] == target:
+                directions[3] = i
+                break
+
+        # Normalize distances to [0, 1]
+        max_distance: float = max(directions)
+        if max_distance > 0:
+            directions: List[float] = [
+                distance / max_distance for distance in directions
+            ]
+
+        return directions
+
+    def get_immediate_danger(self, x, y) -> List[float]:
+        collision = ["wall", "snake_body", "snake_head"]
+        danger: List[float] = [0] * 4
+
+        # Up
+        if x < 0 or self.map[x - 1][y] in collision:
+            danger[0] = 1
+        # Down
+        if (
+            x + 1 >= self.height
+            or self.map[x + 1][y] in collision
+        ):
+            danger[1] = 1
+        # Left
+        if y < 0 or self.map[x][y - 1] in collision:
+            danger[2] = 1
+        # Right
+        if y + 1 >= self.width or self.map[x][y + 1] in collision:
+            danger[3] = 1
+
+        return danger
+
+    # <-- Properties -->
     @property
-    def state(self) -> List[List[str]]:
-        return self.map
-    
-    @property
-    def snakes_alive(self) -> List[Snake]:
-        return [snake for snake in self.snakes if snake.alive]
+    def snakes_done(self) -> List[bool]:
+        return [not snake.alive for snake in self.snakes]
     
     @property
     def rewards(self) -> List[int]:
         return [snake.reward for snake in self.snakes]
+    
+    @property
+    def snake_sizes(self) -> List[int]:
+        return [snake.size for snake in self.snakes]
+
+    @property
+    def snake_states(self) -> List[List[float]]:
+        return [self.get_state(snake) for snake in self.snakes]
+
+    @property
+    def snake_state_size(self) -> int:
+        return len(self.snake_states[0]) if self.snakes else 0
+
+
+if __name__ == "__main__":
+    from src.config.settings import config
+    env = Enviroment(config)
+    print(env.snakes_done)
+    print(env.rewards)
+    print(env.snake_sizes)
+    print(env.snake_states)

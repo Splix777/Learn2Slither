@@ -1,6 +1,6 @@
 from PIL import Image
 
-def create_color_block(color: tuple, filename: str, size: int = 32) -> None:
+def create_color_block(color: tuple, filename: str, size: int = 1) -> None:
     """
     Create a solid color block PNG image.
 

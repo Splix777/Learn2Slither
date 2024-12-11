@@ -138,38 +138,45 @@ class Agent:
         """
         Trains the agent using the replay buffers of each snake.
         """
+        best_score: int = 0
+        best_time: float = 0
 
         for epoch in range(self.epochs):
-            snakes: List[Snake] = self.interpreter.board.snakes
             self.interpreter.reset()
             total_reward: float = 0
             start_time: float = time.time()
 
             while True:
-                states = [self.interpreter.get_state(snake) for snake in snakes]
-                actions = [
-                    self.act(state, snake_data)
-                    for state, snake_data in zip(states, self.snakes_data)
-                ]
-                rewards, dones, scores = self.interpreter.step(actions, snakes)
+                states = self.interpreter.board.snake_states
+                actions = [self.act(state, snake_data) for state, snake_data in zip(states, self.snakes_data)]
+                rewards, dones, scores = self.interpreter.board.step(actions)
+                next_states = self.interpreter.board.snake_states
 
-                next_states = [self.interpreter.get_state(snake) for snake in snakes]
-
-                for i, snake in enumerate(snakes):
+                for i, snake in enumerate(self.interpreter.board.snakes):
                     snake_data = self.snakes_data[i]
-                    self.remember(
-                        snake_data, states[i], actions[i], rewards[i], next_states[i], dones[i]
-                    )
+                    self.remember(snake_data, states[i], actions[i], rewards[i], next_states[i], dones[i])
                     if len(snake_data["memory"]) >= self.batch_size:
                         self.replay(snake_data)
 
                 total_reward += sum(rewards)
-                for snake in snakes:
+                for snake in self.interpreter.board.snakes:
                     if not snake.alive:
-                        snakes.remove(snake)
+                        self.interpreter.board.snakes.remove(snake)
+                self.interpreter.render()
                 if all(dones):
                     for snake_data in self.snakes_data:
                         self.decay_epsilon(snake_data)
+                    for score in scores:
+                        if score > best_score:
+                            best_score = score
+                    if time.time() - start_time > best_time:
+                        best_time = time.time() - start_time
+                    print(
+                        f"Epoch {epoch + 1}/{self.epochs}, "
+                        f"Score: {scores}, "
+                        f"Best Score: {best_score}, "
+                        f"Best Time: {best_time:.2f}s"
+                    )
                     break
                 # time.sleep(.1)
 
