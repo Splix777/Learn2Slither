@@ -23,14 +23,6 @@ snake:
   start_color: blue
   start_speed: 1
   start_size: 3
-  ai_vision: 4
-  player_colors:
-    - red
-    - yellow
-    - green
-  ai_colors:
-    - purple
-    - orange
   max_speed: 5
 
 visual:
@@ -62,67 +54,45 @@ ascii:
 
 pygame_textures:
   wall:
-    dark: wall/wall_dark.png
-    light: wall/wall_light.png
+    dark: wall/wall_block_32_0.png
+    light: wall/wall_block_32_0.png
   snake_head:
-    dark: snake_head/snake_head_dark.png
-    light: snake_head/snake_head_light.png
+    dark: snake_head/snake_green_head_32.png
+    light: snake_head/snake_yellow_head_32.png
   snake_body:
-    dark: snake_body/snake_body_dark.png
-    light: snake_body/snake_body_light.png
+    dark: snake_body/snake_green_blob_32.png
+    light: snake_body/snake_yellow_blob_32.png
   green_apple:
-    dark: green_apple/green_apple_dark.png
-    light: green_apple/green_apple_light.png
+    dark: green_apple_alternate/oliebol_32.png
+    light: green_apple/apple_green_32.png
   red_apple:
-    dark: red_apple/red_apple_dark.png
-    light: red_apple/red_apple_light.png
+    dark: red_apple_alternate/bomb_32.png
+    light: red_apple/apple_red_32.png
   empty:
     dark: empty/empty_dark.png
     light: empty/empty_light.png
+  texture_size: 32
 
 rules:
-  collisions:
-    snake_kill:
-      action: death
-      reward: 10
-      snake_effect: 0
-    wall_collision:
-      action: death
-      reward: -10
-      snake_effect: 0
-    green_apple_collision:
-      action: grow
-      reward: 10
-      snake_effect: 1
-    red_apple_collision:
-      action: shrink 
-      reward: 1
-      snake_effect: -1
+  events:
+    death: -10
+    green_apple: 10
+    red_apple: -5
   win_condition:
     condition: max_snake_size
     max_score: 1
 
-neural_network:
-  architecture:
-    layers:
-      input_size: 16 
-      hidden: [128, 256, 128]
-      output_size: 4
-    activation_function:
-      function: relu
-      output_function: softmax
-    optimizer: adam
-    loss_function: mse
+nn:
   training:
     batch_size: 32
-    epochs: 200
+    epochs: 100
     learning_rate: 0.001
     exploration:
-      epsilon: 1.0
+      epsilon: 0.99
       decay: 0.95
-      epsilon_min: 0.0
+      epsilon_min: 0.00
     gamma: 0.90
-
+    
 paths:
   models: models
   logs: logs

@@ -1,6 +1,6 @@
 from PIL import Image
 
-def create_color_block(color: tuple, filename: str, size: int = 20) -> None:
+def create_color_block(color: tuple, filename: str, size: int = 1) -> None:
     """
     Create a solid color block PNG image.
 
@@ -32,16 +32,16 @@ colors = {
 files_needed = [
     "empty_dark.png",
     "empty_light.png",
-    "green_apple_dark.png",
-    "green_apple_light.png",
-    "red_apple_dark.png",
-    "red_apple_light.png",
-    "snake_body_dark.png",
-    "snake_body_light.png",
-    "snake_head_dark.png",
-    "snake_head_light.png",
-    "wall_dark.png",
-    "wall_light.png",
+    # "green_apple_dark.png",
+    # "green_apple_light.png",
+    # "red_apple_dark.png",
+    # "red_apple_light.png",
+    # "snake_body_dark.png",
+    # "snake_body_light.png",
+    # "snake_head_dark.png",
+    # "snake_head_light.png",
+    # "wall_dark.png",
+    # "wall_light.png",
 ]
 
 # Mapping file names to colors
