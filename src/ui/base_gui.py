@@ -9,7 +9,7 @@ from rich.console import Console
 
 from src.config.settings import Config
 from src.game.environment import Environment
-from src.ui.texture_loader import TextureLoader
+from src.ui.utils.texture_loader import TextureLoader
 
 
 class GUI(ABC):

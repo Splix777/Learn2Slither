@@ -6,7 +6,7 @@ from collections import deque
 
 import torch
 
-from src.ui.gui import GUI
+from src.ui.base_gui import GUI
 from src.utils.plotter import Plotter
 from src.ai.agent import DeepQSnakeAgent
 from src.game.environment import Environment
