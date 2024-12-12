@@ -71,6 +71,9 @@ pygame_textures:
   empty:
     dark: empty/empty_dark.png
     light: empty/empty_light.png
+  backgrounds:
+    dark: backgrounds/splash_background_dark.png
+    light: backgrounds/splash_background_light.png
   texture_size: 32
 
 rules:

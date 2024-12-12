@@ -111,6 +111,7 @@ class PyGameTextures(BaseModel):
     green_apple: ThemedTextures
     red_apple: ThemedTextures
     empty: ThemedTextures
+    backgrounds: ThemedTextures
     texture_size: int
 
 

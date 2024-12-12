@@ -9,7 +9,7 @@ import torch
 from src.ui.gui import GUI
 from src.utils.plotter import Plotter
 from src.ai.agent import DeepQSnakeAgent
-from src.game.enviroment import Enviroment
+from src.game.environment import Environment
 from src.config.settings import Config, config
 
 
@@ -17,7 +17,7 @@ class Interpreter:
     def __init__(
         self,
         config: Config,
-        env: Enviroment,
+        env: Environment,
         plotter: Plotter,
         gui: Optional[GUI] = None,
         model_path: Optional[Path] = None,
@@ -32,7 +32,7 @@ class Interpreter:
         """
         self.config: Config = config
         self.gui: GUI | None = gui
-        self.env: Enviroment = env
+        self.env: Environment = env
         self.plotter: Plotter = plotter
         self.gamma: float = config.nn.training.gamma
         self.batch_size: int = config.nn.training.batch_size
@@ -219,7 +219,7 @@ class Interpreter:
 
 if __name__ == "__main__":
     gui = GUI(config)
-    env = Enviroment(config)
+    env = Environment(config)
     plotter = Plotter()
     saved_model: Path = config.paths.models / "snake_0_best.pth"
     interpreter = Interpreter(

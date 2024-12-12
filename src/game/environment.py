@@ -7,7 +7,7 @@ from src.game.models.starting_positions import StartingPositions
 from src.game.snake import Snake
 
 
-class Enviroment:
+class Environment:
     def __init__(self, config: Config):
         self.config: Config = config
         # <-- Map Dimensions -->
@@ -385,11 +385,15 @@ class Enviroment:
     @property
     def snake_state_size(self) -> int:
         return len(self.snake_states[0]) if self.snakes else 0
+    
+    @property
+    def game_state(self) -> List[List[str]]:
+        return self.map
 
 
 if __name__ == "__main__":
     from src.config.settings import config
-    env = Enviroment(config)
+    env = Environment(config)
     print(env.snakes_done)
     print(env.rewards)
     print(env.snake_sizes)
