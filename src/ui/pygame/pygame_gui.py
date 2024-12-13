@@ -6,20 +6,22 @@ from pygame.key import ScancodeWrapper
 
 from src.ui.base_gui import GUI
 from src.config.settings import Config
-from src.game.environment import Environment
 from src.ui.pygame.screens.game_screen import GameScreen
 from src.ui.pygame.screens.home_screen import HomeScreen
 from src.ui.pygame.screens.landing_screen import LandingScreen
+from src.ui.utils.texture_loader import TextureLoader
 
 
 class PygameGUI(GUI):
-    def __init__(self, config: Config, environment: Environment):
+    def __init__(self, config: Config):
         self.config: Config = config
-        self.environment: Environment = environment
+        self.textures = TextureLoader(config)
 
-        # Initialize Pygame and set up screens
         pygame.init()
-        self.base_resolution = (640, 480)
+        self.base_resolution = (
+            config.map.board_size.width * self.textures.texture_size,
+            config.map.board_size.height * self.textures.texture_size,
+        )
         self.current_resolution = self.base_resolution
         self.screen = pygame.display.set_mode(
             self.base_resolution, pygame.RESIZABLE
@@ -47,16 +49,20 @@ class PygameGUI(GUI):
             # Handle global events
             self.handle_global_events(events)
 
-            # Update environment if on the game screen
-            if isinstance(self.screens["game"], GameScreen):
-                self.screens["game"].update_map_state(
-                    self.environment.game_state
-                )
-
-            # Handle input and switch screens if needed
+            # Update the current screen
             current_screen = self.screens[self.current_screen_name]
             if next_screen_name := current_screen.handle_input(events):
-                self.current_screen_name: str = next_screen_name
+                if next_screen_name in ["human_vs_ai", "ai_solo"]:
+                    self.screens["game"] = GameScreen(
+                        self.config, next_screen_name
+                    )
+                    self.current_screen_name = "game"
+                else:
+                    self.current_screen_name = next_screen_name
+
+            # Check for resize request
+            if new_size := current_screen.get_requested_screen_size():
+                self.resize_screen(new_size)
 
             # Render the current screen
             current_screen.update()
@@ -66,7 +72,7 @@ class PygameGUI(GUI):
             self.render_fps(self.screen)
 
             pygame.display.flip()
-            self.clock.tick(60)
+            self.clock.tick(5)
 
     def render_fps(self, screen: pygame.Surface) -> None:
         """Render the FPS counter in the top-right corner."""
@@ -91,12 +97,36 @@ class PygameGUI(GUI):
             if keys[pygame.K_ESCAPE]:
                 self.running = False
 
+    def resize_screen(self, new_size: tuple[int, int]) -> None:
+        """Resize the screen."""
+        self.current_resolution = new_size
+        self.screen = pygame.display.set_mode(
+            self.current_resolution, pygame.RESIZABLE
+        )
+
+    def training_render(self, game_state: List[List[str]]) -> None:
+        """Render the game environment."""
+        if not self.screen:
+            return
+        self.screen.fill(color=(18, 90, 60))
+        for row_num, row in enumerate(iterable=game_state):
+            for col_num, cell in enumerate(iterable=row):
+                texture: pygame.Surface = pygame.image.load(
+                    str(self.textures.textures[cell])
+                )
+                self.screen.blit(
+                    texture,
+                    (
+                        col_num * self.textures.texture_size,
+                        row_num * self.textures.texture_size,
+                    ),
+                )
+
+        pygame.display.update()
+
 
 if __name__ == "__main__":
-    from src.game.environment import Environment
     from src.config.settings import config
 
-    config: Config
-    environment = Environment(config)
-    gui = PygameGUI(config, environment)
+    gui = PygameGUI(config)
     gui.run()

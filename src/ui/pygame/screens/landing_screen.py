@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import pygame
 from pygame.event import Event
 from time import time
@@ -11,27 +11,23 @@ class LandingScreen(BaseScreen):
     def __init__(self, config: Config) -> None:
         self.config: Config = config
 
-        # Fonts and colors
         self.large_font = pygame.font.Font(None, 120)
         self.small_font = pygame.font.Font(None, 24)
-        self.title_color = (18, 90, 60)
-        self.shadow_color = (0, 0, 0)
-        self.instruction_color = (200, 200, 200)
+        self.requested_screen_size = None
+        self.request_screen_resize((640, 480))
 
-        # Render title text with a shadow effect
         self.title_text = self.large_font.render(
-            "Battle Snakes", True, self.title_color
+            "Battle Snakes", True, (18, 90, 60)
         )
         self.shadow_text = self.large_font.render(
-            "Battle Snakes", True, self.shadow_color
+            "Battle Snakes", True, (0, 0, 0)
         )
 
-        # Instruction text
         self.instructions_text = self.small_font.render(
-            "Press ENTER or SPACE to Start", True, self.instruction_color
+            "Press ENTER or SPACE to Start", True, (200, 200, 200)
         )
 
-        self.blink_start_time = time()
+        self.blink_start_time: float = time()
         self.blink_duration = 0.5
         self.show_instructions = True
 
@@ -50,29 +46,27 @@ class LandingScreen(BaseScreen):
         return ""
 
     def update(self) -> None:
-        """Update the screen (e.g., animations)."""
-        # Handle blinking effect for instruction text
+        """Update the landing screen."""
         current_time: float = time()
         if current_time - self.blink_start_time >= self.blink_duration:
-            self.show_instructions = not self.show_instructions
+            self.show_instructions: bool = not self.show_instructions
             self.blink_start_time = current_time
 
     def render(self, screen: pygame.Surface) -> None:
         """Render the landing screen."""
-        # Fill the background
+        if screen.get_size() != (640, 480):
+            self.request_screen_resize((640, 480))
+
         screen.fill((30, 30, 30))
 
-        # Use Background Image
-        background = pygame.image.load(
+        background: pygame.Surface = pygame.image.load(
             self.config.pygame_textures.backgrounds.dark
         )
 
-        # Scale the background image to fit the screen
         screen.blit(
             pygame.transform.scale(background, screen.get_size()), (0, 0)
         )
 
-        # Position title with a shadow for depth
         title_x: int = (
             screen.get_width() // 2 - self.title_text.get_width() // 2
         )
@@ -82,7 +76,6 @@ class LandingScreen(BaseScreen):
         screen.blit(self.shadow_text, (title_x + 5, title_y + 5))
         screen.blit(self.title_text, (title_x, title_y))
 
-        # Render instructions below the title if visible
         if self.show_instructions:
             instructions_x = (
                 screen.get_width() // 2
@@ -92,3 +85,13 @@ class LandingScreen(BaseScreen):
             screen.blit(
                 self.instructions_text, (instructions_x, instructions_y)
             )
+
+    def request_screen_resize(self, new_size: tuple[int, int]) -> None:
+        """Request a screen size update."""
+        self.requested_screen_size = new_size
+
+    def get_requested_screen_size(self) -> Optional[tuple[int, int]]:
+        """Return the requested screen size and reset the request."""
+        size = self.requested_screen_size
+        self.requested_screen_size = None
+        return size

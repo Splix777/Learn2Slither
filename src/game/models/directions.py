@@ -39,6 +39,27 @@ class Direction(Enum):
         return mapping[direction]
 
     @staticmethod
+    def from_int(direction: int) -> "Direction":
+        """
+        Returns the Direction from an integer.
+
+        Args:
+            direction (int): The integer representation of the direction.
+
+        Returns:
+            Direction: The direction.
+        """
+        if direction not in range(4):
+            raise ValueError("Invalid direction.")
+        mapping: List[Direction] = [
+            Direction.UP,
+            Direction.DOWN,
+            Direction.LEFT,
+            Direction.RIGHT,
+        ]
+        return mapping[direction]
+
+    @staticmethod
     def from_one_hot(one_hot: List[int]) -> "Direction":
         """
         Returns the Direction from one-hot encoding.

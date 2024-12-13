@@ -20,7 +20,9 @@ class DeepQSnakeAgent(nn.Module):
         super().__init__()
         self.model = nn.Sequential(
             nn.Linear(input_size, 128),
-            nn.LeakyReLU(0.01),
+            # nn.LeakyReLU(0.01),
+            # nn.Linear(128, 256),
+            # nn.LeakyReLU(0.01),
             nn.Linear(128, output_size),
         )
         self.optimizer = torch.optim.Adam(

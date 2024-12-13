@@ -58,7 +58,7 @@ class Snake:
                 new_direction = Direction.from_one_hot(direction)
         elif isinstance(direction, int):
             with suppress(ValueError):
-                new_direction = Direction(direction)
+                new_direction = Direction.from_int(direction)
 
         if new_direction != self.movement_direction.opposite:
             self.movement_direction = new_direction

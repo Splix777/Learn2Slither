@@ -28,12 +28,12 @@ class BoardSize(BaseModel):
     """Board size configuration model."""
     width: int = Field(
         ge=10,
-        le=100,
+        le=20,
         description="Board width must be greater or equal to 10",
     )
     height: int = Field(
         ge=10,
-        le=100,
+        le=20,
         description="Board height must be greater or equal to 10",
     )
 
@@ -49,29 +49,25 @@ class MapConfig(BaseModel):
     )
     snakes: int = Field(
         gt=0,
-        le=4,
-        description="Starting snakes must be greater than 0 and less than 4",
+        le=2,
+        description="Starting snakes must be greater than 0 and less than 3",
     )
 
 
 class SnakeConfig(BaseModel):
     """Snake configuration model."""
     start_color: str
-    start_speed: int
     start_size: int = Field(
         gt=0,
         lt=10,
         description="Starting size must be greater than 0 and less than 10",
     )
-    max_speed: int
 
 
 class VisualModes(BaseModel):
     """Visual modes configuration model."""
     mode: Literal["cli", "pygame"]
     available_modes: List[Literal["cli", "pygame"]]
-    control: List[Literal["auto", "manual"]]
-    multiplayer_modes: List[Literal["free_for_all", "team"]]
 
 
 class ThemesConfig(BaseModel):
@@ -83,7 +79,6 @@ class ThemesConfig(BaseModel):
 class VisualConfig(BaseModel):
     """Visual configuration model."""
     modes: VisualModes
-    speed: Literal["slow", "normal", "fast"]
     themes: ThemesConfig
 
 
@@ -150,6 +145,7 @@ class TrainingConfig(BaseModel):
     learning_rate: float
     exploration: ExplorationConfig
     gamma: float
+    update_frequency: int
 
 
 class NeuralNetworkConfig(BaseModel):

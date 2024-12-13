@@ -70,15 +70,6 @@ class TextureLoader:
             for key in self.KEYS
         }
 
-# <-- Testing -->
-def print_textures(textures: dict):
-    console = Console()
-    for name, texture in textures.items():
-        console.print(texture, f" {name}")
-
-
-if __name__ == "__main__":
-    config = get_config()
-    textures = TextureLoader(config)
-
-    print_textures(textures.textures)
+    @property
+    def texture_size(self) -> int:
+        return self.config.pygame_textures.texture_size
