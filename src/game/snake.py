@@ -19,6 +19,7 @@ class Snake:
         self.reward: int = 0
         self.red_apples_eaten: int = 0
         self.green_apples_eaten: int = 0
+        self.steps_without_food: int = 0
         self.head: Tuple[int, int] = start_pos
         self.body: List[Tuple[int, int]] = [self.head]
         self.movement_direction: Direction = start_dir
@@ -106,7 +107,8 @@ class Snake:
             event (str): The event that occurred.
             reward (int): The reward to add.
         """
-        if event in {"death", "green_apple", "red_apple"}:
+        if event in {"death", "green_apple", "red_apple", "looping"}:
+            # print(f"Snake {self.id} - Event: {event} - Reward: {reward}")
             self.reward = reward
 
     # <-- Properties -->

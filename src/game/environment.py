@@ -3,9 +3,10 @@ from typing import List, Tuple
 from itertools import product
 import torch
 
-from src.config.settings import Config
-from src.game.models.starting_positions import StartingPositions
 from src.game.snake import Snake
+from src.config.settings import Config
+from src.game.models.directions import Direction
+from src.game.models.starting_positions import StartingPositions
 
 
 class Environment:
@@ -96,17 +97,6 @@ class Environment:
             for segment in snake.body
         )
 
-    def _update_snake_rewards(self, snake: Snake, event: str | None) -> None:
-        """Update the snake's reward based on the event."""
-        event_rewards: dict[str, int] = {
-            "death": self.config.rules.events.death,
-            "green_apple": self.config.rules.events.green_apple,
-            "red_apple": self.config.rules.events.red_apple,
-        }
-
-        if event in event_rewards:
-            snake.update_reward(event, event_rewards[event])
-
     # <-- Apple methods -->
     def add_apples(self) -> None:
         """Add apples to random empty spaces on the map."""
@@ -120,8 +110,10 @@ class Environment:
             self.map[y][x] = "red_apple"
             self.current_red_apples += 1
 
-    # <-- Collisions -->
-    def check_collision(self, snake: Snake, snakes: List[Snake]) -> str | None:
+    # <-- Events -->
+    def check_collision(
+        self, snake: Snake, snakes: List[Snake]
+    ) -> str | None:
         """Check if the snake collided with a wall or another snake."""
         if self._collided_with_wall(snake):
             self._delete_snake(snake)
@@ -151,21 +143,41 @@ class Environment:
             self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
         snake.alive = False
 
-    # <-- Game state update methods -->
     def check_apple_eaten(self, snake: Snake) -> str | None:
         """Check if the snake ate an apple."""
         if self.map[snake.head[0]][snake.head[1]] == "green_apple":
             self.current_green_apples -= 1
             snake.green_apples_eaten += 1
+            snake.steps_without_food = 0
             snake.grow()
             return "green_apple"
         elif self.map[snake.head[0]][snake.head[1]] == "red_apple":
             self.current_red_apples -= 1
             snake.red_apples_eaten += 1
+            snake.steps_without_food = 0
             snake.shrink()
             return "red_apple"
         return None
 
+    def check_looping(self, snake: Snake) -> str | None:
+        """Check if the snake is looping."""
+        if snake.steps_without_food >= self.config.rules.steps_no_apple:
+            return "looping"
+        return None
+
+    def _update_snake_rewards(self, snake: Snake, event: str | None) -> None:
+        """Update the snake's reward based on the event."""
+        event_rewards: dict[str, int] = {
+            "death": self.config.rules.events.death,
+            "green_apple": self.config.rules.events.green_apple,
+            "red_apple": self.config.rules.events.red_apple,
+            "looping": self.config.rules.events.looping,
+        }
+
+        if event in event_rewards:
+            snake.update_reward(event, event_rewards[event])
+
+    # <-- Snake Movement -->
     def update_snake_position(self, snake: Snake) -> None:
         """Update the snake's position on the map."""
         if not snake.alive:
@@ -180,10 +192,11 @@ class Environment:
     def move_snake(self, snake: Snake) -> None:
         """Move the snake in the current direction."""
         empty_spaces: List[Tuple[int, int]] = snake.move()
+        snake.steps_without_food += 1
         for space in empty_spaces:
             self.map[space[0]][space[1]] = "empty"
 
-    def step(self, actions: List[List[int]]) -> Tuple:
+    def step(self, actions: List[List[int]] | List[int]) -> Tuple:
         """Perform one step in the game based on the chosen action."""
         [snake.reset_reward() for snake in self.snakes]
         for snake, action in zip(self.snakes, actions):
@@ -191,9 +204,11 @@ class Environment:
             self.move_snake(snake)
             apple_event = self.check_apple_eaten(snake)
             collision_event = self.check_collision(snake, self.snakes)
-            if collision_event or apple_event:
+            looping_event = self.check_looping(snake)
+            if collision_event or apple_event or looping_event:
                 self._update_snake_rewards(
-                    snake, collision_event or apple_event
+                    snake,
+                    collision_event or apple_event or looping_event
                 )
             self.update_snake_position(snake)
 
@@ -216,7 +231,7 @@ class Environment:
 
         self.add_apples()
 
-    # <-- Snake States -->
+    # <-- Snake States Getters -->
     def get_state(self, snake: "Snake") -> torch.Tensor:
         """Get an enhanced state representation for the snake."""
         head_x, head_y = snake.head
@@ -230,7 +245,7 @@ class Environment:
         red_apples = self.target_distances(head_x, head_y, "red_apple")
         walls = self.target_distances(head_x, head_y, "wall")
         snake_body = self.target_distances(head_x, head_y, "snake_body")
-        immediate_danger = self.get_immediate_danger_with_distances(
+        immediate_danger = self.assess_nearby_risks(
             head_x, head_y
         )
         segmented_vision = self.segmented_vision(head_x, head_y, max_steps=5)
@@ -257,43 +272,81 @@ class Environment:
             ]
         )
 
+    def get_state_by_id(self, snake_id: int) -> torch.Tensor:
+        """Get the state of a specific snake."""
+        return self.get_state(self.snakes[snake_id])
+
+    # <-- Enhanced Features -->
     def target_distances(self, x: int, y: int, target: str) -> torch.Tensor:
         """Calculate normalized distances to the closest target."""
-        distances = torch.ones(4)
-        directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
+        distances = torch.ones(4, dtype=torch.float)
+        # directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
 
-        for index, (dx, dy) in enumerate(directions):
-            steps = 0
-            while True:
-                nx, ny = x + steps * dx.item(), y + steps * dy.item()
-                if (
-                    nx < 0
-                    or ny < 0
-                    or nx >= self.height
-                    or ny >= self.width
-                    or self.map[nx][ny] == "wall"
-                ):
+        # for index, (dx, dy) in enumerate(directions):
+        #     steps = 0
+        #     while True:
+        #         nx, ny = x + steps * dx.item(), y + steps * dy.item()
+        #         if (
+        #             nx < 0
+        #             or ny < 0
+        #             or nx >= self.height
+        #             or ny >= self.width
+        #             or self.map[nx][ny] == "wall"
+        #         ):
+        #             break
+        #         if self.map[nx][ny] == target:
+        #             distances[index] = steps / max(self.width, self.height)
+        #             break
+        #         steps += 1
+
+        # return distances
+
+        for index, direction in enumerate(Direction):
+            dr, dc = direction.value
+            for step in range(1, max(self.width, self.height)):
+                nx, ny = x + dr * step, y + dc * step
+                if not (0 <= nx < self.height and 0 <= ny < self.width):
+                    distances[index] = self._normalize(
+                        step - 1,
+                        max(self.width, self.height)
+                    )
                     break
                 if self.map[nx][ny] == target:
-                    distances[index] = steps / max(self.width, self.height)
+                    distances[index] = self._normalize(
+                        step,
+                        max(self.width, self.height)
+                    )
                     break
-                steps += 1
 
         return distances
 
-    def get_immediate_danger_with_distances(self, x: int, y: int) -> torch.Tensor:
+    def assess_nearby_risks(self, x: int, y: int) -> torch.Tensor:
         """Detect immediate danger in the four cardinal directions."""
-        danger = torch.zeros(4)
-        directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
+        danger = torch.zeros(4, dtype=torch.float)
+        # directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
 
-        for index, (dx, dy) in enumerate(directions):
-            nx, ny = x + dx.item(), y + dy.item()
+        # for index, (dx, dy) in enumerate(directions):
+        #     nx, ny = x + dx.item(), y + dy.item()
+        #     if (
+        #         nx < 0
+        #         or ny < 0
+        #         or nx >= self.height
+        #         or ny >= self.width
+        #         or self.map[nx][ny] in ["wall", "snake_body"]
+        #     ):
+        #         danger[index] = 1.0
+
+        # return danger
+
+        for index, direction in enumerate(Direction):
+            dr, dc = direction.value
+            nx, ny = x + dr, y + dc
             if (
                 nx < 0
                 or ny < 0
                 or nx >= self.height
                 or ny >= self.width
-                or self.map[nx][ny] in ["wall", "snake_body"]
+                or self.map[nx][ny] in ["wall", "snake_body", "snake_head"]
             ):
                 danger[index] = 1.0
 
@@ -301,7 +354,7 @@ class Environment:
 
     def segmented_vision(self, x: int, y: int, max_steps: int = 5) -> torch.Tensor:
         """Provide segmented vision looking steps ahead in each direction."""
-        vision = torch.ones(4)
+        vision = torch.ones(4, dtype=torch.float)
         directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
 
         for index, (dx, dy) in enumerate(directions):
@@ -327,13 +380,16 @@ class Environment:
 
     def path_clearances(self, x: int, y: int) -> torch.Tensor:
         """Calculate the maximum clear path length in each direction."""
-        clearances = torch.zeros(4)
+        clearances = torch.zeros(4, dtype=torch.float)
         directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
 
         for index, (dx, dy) in enumerate(directions):
             steps = 0
             while True:
-                nx, ny = x + (steps + 1) * dx.item(), y + (steps + 1) * dy.item()
+                nx, ny = (
+                    x + (steps + 1) * dx.item(),
+                    y + (steps + 1) * dy.item(),
+                )
                 if (
                     nx < 0
                     or ny < 0
@@ -349,7 +405,7 @@ class Environment:
 
     def apple_density(self, x: int, y: int) -> torch.Tensor:
         """Calculate the density of apples in each direction."""
-        densities = torch.zeros(4)
+        densities = torch.zeros(4, dtype=torch.float)
         directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
 
         for index, (dx, dy) in enumerate(directions):
@@ -366,7 +422,7 @@ class Environment:
 
     def open_space_ratio(self, x: int, y: int) -> torch.Tensor:
         """Calculate the ratio of open space in each direction."""
-        open_ratios = torch.zeros(4)
+        open_ratios = torch.zeros(4, dtype=torch.float)
         directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
 
         for index, (dx, dy) in enumerate(directions):
@@ -381,23 +437,32 @@ class Environment:
 
         return open_ratios
 
-
-    def get_state_by_snake(self, snake_id: int) -> torch.Tensor:
-        """Get the state of a specific snake."""
-        return self.get_state(self.snakes[snake_id])
+    # <-- State Utilities -->
+    def _normalize(self, value: int, max_value: int) -> float:
+        """Normalize a value between 0 and 1."""
+        return value / max_value if max_value != 0 else 0
 
     # <-- Properties -->
     @property
-    def snakes_dead(self) -> List[bool]:
-        return [not snake.alive for snake in self.snakes]
+    def snakes_dead(self) -> torch.Tensor:
+        return torch.tensor(
+            [not snake.alive for snake in self.snakes],
+            dtype=torch.float
+        )
 
     @property
-    def rewards(self) -> List[int]:
-        return [snake.reward for snake in self.snakes]
+    def rewards(self) -> torch.Tensor:
+        return torch.tensor(
+            [snake.reward for snake in self.snakes],
+            dtype=torch.float
+        )
 
     @property
-    def snake_sizes(self) -> List[int]:
-        return [snake.size for snake in self.snakes]
+    def snake_sizes(self) -> torch.Tensor:
+        return torch.tensor(
+            [snake.size for snake in self.snakes],
+            dtype=torch.float
+        )
 
     @property
     def snake_states(self) -> List[torch.Tensor]:
@@ -416,6 +481,14 @@ if __name__ == "__main__":
     from src.config.settings import config
 
     env = Environment(config)
+    print(env.snakes_dead)
+    print(env.rewards)
+    print(env.snake_sizes)
+    print(env.snake_states)
+
+    # take a step
+    env.process_human_turn()
+
     print(env.snakes_dead)
     print(env.rewards)
     print(env.snake_sizes)

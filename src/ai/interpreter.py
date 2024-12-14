@@ -1,7 +1,7 @@
 from pathlib import Path
 import time
 import random
-from typing import Optional
+from typing import Optional, List
 from collections import deque
 
 import torch
@@ -27,115 +27,132 @@ class Interpreter:
         Initializes the AI agent for Snake.
         Args:
             config (Config): Configuration settings.
-            gui (GUI): GUI for rendering the game.
+            env (Environment): Environment for the agent.
             plotter (Plotter): Plotter for visualizing training.
+            gui (GUI): GUI for rendering the game.
             model_path (str, optional): Path to load pre-trained model.
         """
         self.config: Config = config
         self.gui: PygameGUI | None = gui
         self.env: Environment = env
         self.plotter: Plotter = plotter
+        # <-- Hyperparameters -->
         self.gamma: float = config.nn.training.gamma
         self.batch_size: int = config.nn.training.batch_size
         self.epochs: int = config.nn.training.epochs
         self.decay: float = config.nn.training.exploration.decay
         self.epsilon = config.nn.training.exploration.epsilon
         self.epsilon_min: float = config.nn.training.exploration.epsilon_min
-
-        # Initialize a single model and a target model for training stability
+        # <-- Models -->
         self.shared_model = DeepQSnakeAgent(env.snake_state_size, 4, config)
         self.target_model = DeepQSnakeAgent(env.snake_state_size, 4, config)
         self.memory = deque(maxlen=100_000)
-
         # Load pre-trained model if provided
         if model_path:
             self.shared_model.load(model_path)
             self.target_model.load_state_dict(self.shared_model.state_dict())
 
+    # <-- Model Utils -->
     def update_target_model(self) -> None:
-        """
-        Updates the target model by copying weights from the shared model.
-        """
+        """Updates the target model from the shared model."""
         self.target_model.load_state_dict(self.shared_model.state_dict())
 
+    def move_to_device(self, batch: List[torch.Tensor]) -> List[torch.Tensor]:
+        """Moves a batch of tensors to the device."""
+        return [data.to(self.shared_model.device) for data in batch]
+
     def cache(self, state, action, reward, next_state, done) -> None:
-        """
-        Stores an experience in the shared replay buffer.
-        """
+        """Stores an experience in the shared replay cache."""
         self.memory.append((state, action, reward, next_state, done))
 
-    def exploration_act(self, state: torch.Tensor) -> list[int]:
-        """
-        Chooses an action based on epsilon-greedy strategy using the shared model.
-        """
+    # <-- Training -->
+    def select_action_epsilon_greedy(self, state: torch.Tensor):
+        """Chooses an action based on epsilon-greedy strategy."""
         if random.random() >= self.epsilon:
             return self.act(state)
-        movement = torch.zeros(4, dtype=torch.float)
-        movement[random.randrange(4)] = 1
-        return movement.int().tolist()
+        return random.randrange(4)
 
-    def act(self, state: torch.Tensor) -> list[int]:
-        """
-        Chooses an action based on the greedy strategy using the shared model.
-        """
-        # state_tensor = torch.tensor(state, dtype=torch.float).unsqueeze(0)
+    def act(self, state: torch.Tensor):
+        """Chooses an action using the shared model."""
         state_tensor: torch.Tensor = state.unsqueeze(0)
         with torch.no_grad():
             q_values = self.shared_model(state_tensor)
-        move = torch.argmax(q_values, dim=1).item()
-        movement = torch.zeros(4)
-        movement[int(move)] = 1
-        return movement.int().tolist()
+        return int(torch.argmax(q_values, dim=1).item())
 
     def train_step(self, batch) -> None:
-        """
-        Performs a training step using a batch of experiences from the shared memory.
-        """
-        states, actions, rewards, next_states, dones = batch
+        """Training step using a batch of experiences from cache."""
+        states, actions, rewards, dones, next_states = self.move_to_device(
+            batch
+        )
 
+        # Scale the rewards(clip to avoid exploding gradients)
+        rewards = torch.clamp(rewards, -1, 1)
+
+        # Move the tensors to the device
+        # rewards: torch.Tensor = rewards.to(self.shared_model.device)
+        # dones: torch.Tensor = dones.to(self.shared_model.device)
+
+        # Get the Q-values for the current states
+        # predictions: torch.Tensor = self.shared_model(states.to(self.shared_model.device))
         predictions: torch.Tensor = self.shared_model(states)
-        targets_full: torch.Tensor = predictions.clone().detach() 
 
-        for idx in range(len(dones)):
-            q_new = rewards[idx]
-            if not dones[idx]:
-                q_new = rewards[idx] + self.gamma * torch.max(self.target_model(next_states[idx]))
+        # Clone the predictions to create the target values
+        # Detach basically means don't calculate the gradients for the target values
+        targets_full: torch.Tensor = (
+            predictions.clone().detach().requires_grad_(False)
+        )
 
-            targets_full[idx][actions[idx]] = q_new
+        # Batch process next states for efficiency
+        with torch.no_grad():
+            # q_next = self.target_model(next_states.to(self.target_model.device)).max(dim=1).values
+            q_next = self.target_model(next_states).max(dim=1).values
 
+        # Compute Q-values for the terminal states and non-terminal states
+        q_new = rewards + (1 - dones) * self.gamma * q_next
+
+        # Update the targets for the actions taken
+        # targets_full[torch.arange(self.batch_size), actions] = q_new
+        targets_full[range(self.batch_size), actions] = q_new
+
+        # Compute the loss and backpropagate
+        loss = self.shared_model.criterion(predictions, targets_full)
+
+        # Backpropagate the loss
         self.shared_model.optimizer.zero_grad()
-        loss = self.shared_model.criterion(targets_full, predictions)
         loss.backward()
+
+        # Gradient clipping to avoid exploding gradients
+        # torch.nn.utils.clip_grad_norm_(self.shared_model.parameters(), max_norm=1)
+
+        # Update the weights
         self.shared_model.optimizer.step()
 
     def replay(self) -> None:
-        """
-        Samples a batch from the shared memory and trains the model.
-        """
+        """Samples and trains a batch from the shared memory."""
         if len(self.memory) < self.batch_size:
             return
-        
-        # Create a DataLoader from the memory, batching the data
+
         batch = random.sample(self.memory, self.batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
-        
-        states: torch.Tensor = torch.stack(list(states))
-        actions: torch.Tensor = torch.tensor(actions, dtype=torch.long)
-        rewards: torch.Tensor = torch.tensor(rewards, dtype=torch.float)
-        next_states: torch.Tensor = torch.stack(list(next_states))
-        dones: torch.Tensor = torch.tensor(dones, dtype=torch.bool)
-        
-        # Use TensorDataset and DataLoader for batching
-        dataset = TensorDataset(states, actions, rewards, next_states, dones)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        states, actions, rewards, dones, next_states = zip(*batch)
+
+        actions = torch.tensor(actions, dtype=torch.long)
+        states = torch.stack(states)
+        next_states = torch.stack(next_states)
+        rewards = torch.stack(rewards)
+        dones = torch.stack(dones)
+
+        dataset = TensorDataset(states, actions, rewards, dones, next_states)
+        dataloader = DataLoader(
+            dataset=dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+        )
 
         for batch in dataloader:
             self.train_step(batch)
 
     def decay_epsilon(self) -> None:
-        """
-        Decays epsilon after each episode.
-        """
+        """Decays epsilon after each episode."""
         self.epsilon = max(self.epsilon_min, self.epsilon * self.decay)
 
     def train(self) -> None:
@@ -151,23 +168,24 @@ class Interpreter:
             start_time: float = time.time()
 
             while True:
-                states = self.env.snake_states
-                actions = [self.exploration_act(state) for state in states]
+                states: List[torch.Tensor] = self.env.snake_states
+                actions: List[int] = [
+                    self.select_action_epsilon_greedy(state)
+                    for state in states
+                ]
                 rewards, dones, scores = self.env.step(actions)
-                next_states = self.env.snake_states
+                next_states: List[torch.Tensor] = self.env.snake_states
 
                 for i in range(len(self.env.snakes)):
                     self.cache(
                         states[i],
                         actions[i],
                         rewards[i],
-                        next_states[i],
                         dones[i],
+                        next_states[i],
                     )
                 if len(self.memory) > self.batch_size:
                     self.replay()
-
-                total_reward += sum(rewards)
 
                 if self.gui:
                     self.gui.training_render(self.env.game_state)
@@ -233,8 +251,8 @@ class Interpreter:
 
 
 if __name__ == "__main__":
-    # gui = PygameGUI(config)
     gui = None
+    # gui = PygameGUI(config)
     env = Environment(config)
     plotter = Plotter()
     saved_model: Optional[Path] = config.paths.models / "snake_best.pth"
@@ -247,10 +265,10 @@ if __name__ == "__main__":
         plotter=plotter,
         model_path=saved_model or None,
     )
-    try:
-        interpreter.train()
-        # interpreter.evaluate()
-    except KeyboardInterrupt:
-        pass
-    except Exception as e:
-        print(e)
+    # try:
+    interpreter.train()
+    interpreter.evaluate()
+    # except KeyboardInterrupt:
+    #     pass
+    # except Exception as e:
+    #     print(e)

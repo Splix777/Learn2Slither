@@ -67,7 +67,7 @@ class GameScreen(BaseScreen):
     def _handle_ai_movement(self, snake_index: int) -> None:
         """Handle AI movement based on the current state."""
         ai_actions = self.get_ai_movement(
-            self.env.get_state_by_snake(snake_index).tolist()
+            self.env.get_state_by_id(snake_index).tolist()
         )
         self.ai_controller(ai_actions)
         self.env.process_human_turn()

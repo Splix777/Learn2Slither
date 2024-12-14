@@ -110,11 +110,12 @@ class PyGameTextures(BaseModel):
     texture_size: int
 
 
-class Collisions(BaseModel):
+class Events(BaseModel):
     """Collisions configuration model."""
     death: int
     green_apple: int
     red_apple: int
+    looping: int
 
 
 class WinConditionsConfig(BaseModel):
@@ -127,7 +128,8 @@ class WinConditionsConfig(BaseModel):
 
 class RulesConfig(BaseModel):
     """Rules configuration model."""
-    events: Collisions
+    events: Events
+    steps_no_apple: int
     win_condition: WinConditionsConfig
 
 

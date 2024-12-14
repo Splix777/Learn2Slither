@@ -70,17 +70,19 @@ pygame_textures:
 
 rules:
   events:
-    death: -10
-    green_apple: 10
-    red_apple: -5
+    death: -5
+    green_apple: 5
+    red_apple: -1
+    looping: -5
+  steps_no_apple: 30
   win_condition:
     condition: max_snake_size
     max_score: 10
 
 nn:
   training:
-    batch_size: 32
-    epochs: 100_000
+    batch_size: 256
+    epochs: 100
     learning_rate: 0.001
     exploration:
       epsilon: 0.99
