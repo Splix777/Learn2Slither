@@ -454,8 +454,7 @@ class Environment:
     def rewards(self) -> torch.Tensor:
         return torch.tensor(
             [snake.reward for snake in self.snakes],
-            dtype=torch.float
-        )
+            dtype=torch.float)
 
     @property
     def snake_sizes(self) -> torch.Tensor:

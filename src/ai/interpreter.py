@@ -1,7 +1,7 @@
 from pathlib import Path
 import time
 import random
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from collections import deque
 
 import torch
@@ -44,88 +44,83 @@ class Interpreter:
         self.epsilon = config.nn.training.exploration.epsilon
         self.epsilon_min: float = config.nn.training.exploration.epsilon_min
         # <-- Models -->
-        self.shared_model = DeepQSnakeAgent(env.snake_state_size, 4, config)
+        self.train_model = DeepQSnakeAgent(env.snake_state_size, 4, config)
         self.target_model = DeepQSnakeAgent(env.snake_state_size, 4, config)
         self.memory = deque(maxlen=100_000)
         # Load pre-trained model if provided
         if model_path:
-            self.shared_model.load(model_path)
-            self.target_model.load_state_dict(self.shared_model.state_dict())
+            self.train_model.load(model_path)
+            self.target_model.load_state_dict(self.train_model.state_dict())
 
     # <-- Model Utils -->
     def update_target_model(self) -> None:
         """Updates the target model from the shared model."""
-        self.target_model.load_state_dict(self.shared_model.state_dict())
+        self.target_model.load_state_dict(self.train_model.state_dict())
 
     def move_to_device(self, batch: List[torch.Tensor]) -> List[torch.Tensor]:
         """Moves a batch of tensors to the device."""
-        return [data.to(self.shared_model.device) for data in batch]
+        return [data.to(self.train_model.device) for data in batch]
 
-    def cache(self, state, action, reward, next_state, done) -> None:
+    def cache(self, experiences: List[Tuple]) -> None:
         """Stores an experience in the shared replay cache."""
-        self.memory.append((state, action, reward, next_state, done))
+        self.memory.extend(experiences)
 
+    def decay_epsilon(self) -> None:
+        """Decays epsilon after each episode."""
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay)
+
+    def save_model(self, path: str | Path) -> None:
+        """Saves the model to a specified file."""
+        self.train_model.save(path)
     # <-- Training -->
-    def select_action_epsilon_greedy(self, state: torch.Tensor):
+    def act(self, state: torch.Tensor):
         """Chooses an action based on epsilon-greedy strategy."""
         if random.random() >= self.epsilon:
-            return self.act(state)
+            return self.choose_action(state)
         return random.randrange(4)
 
-    def act(self, state: torch.Tensor):
+    def choose_action(self, state: torch.Tensor):
         """Chooses an action using the shared model."""
         state_tensor: torch.Tensor = state.unsqueeze(0)
         with torch.no_grad():
-            q_values = self.shared_model(state_tensor)
+            q_values = self.train_model(state_tensor)
         return int(torch.argmax(q_values, dim=1).item())
 
     def train_step(self, batch) -> None:
         """Training step using a batch of experiences from cache."""
-        states, actions, rewards, dones, next_states = self.move_to_device(
-            batch
-        )
+        state, action, reward, done, next_state = self.move_to_device(batch)
 
-        # Scale the rewards(clip to avoid exploding gradients)
-        rewards = torch.clamp(rewards, -1, 1)
-
-        # Move the tensors to the device
-        # rewards: torch.Tensor = rewards.to(self.shared_model.device)
-        # dones: torch.Tensor = dones.to(self.shared_model.device)
+        # Reward clipping
+        reward = torch.clamp(reward, -1, 1)
 
         # Get the Q-values for the current states
-        # predictions: torch.Tensor = self.shared_model(states.to(self.shared_model.device))
-        predictions: torch.Tensor = self.shared_model(states)
+        q_values = self.train_model(state)
 
-        # Clone the predictions to create the target values
-        # Detach basically means don't calculate the gradients for the target values
-        targets_full: torch.Tensor = (
-            predictions.clone().detach().requires_grad_(False)
-        )
+        # Get the Q-values for the next states
+        next_q_values = q_values.clone().detach().requires_grad_(False)
 
-        # Batch process next states for efficiency
+        # Compute the Q-values for the next states
         with torch.no_grad():
-            # q_next = self.target_model(next_states.to(self.target_model.device)).max(dim=1).values
-            q_next = self.target_model(next_states).max(dim=1).values
+            # No gradient calculation for the target model since
+            # we are not training it. We just use it to get the
+            # Q-values for the next states. That way it does not
+            # affect the gradients of the training model.
+            q_next = self.target_model(next_state).max(dim=1).values
 
-        # Compute Q-values for the terminal states and non-terminal states
-        q_new = rewards + (1 - dones) * self.gamma * q_next
+        # Apply the Bellman equation
+        q_new = reward + (1 - done) * self.gamma * q_next
 
-        # Update the targets for the actions taken
-        # targets_full[torch.arange(self.batch_size), actions] = q_new
-        targets_full[range(self.batch_size), actions] = q_new
+        next_q_values[range(self.batch_size), action] = q_new
 
         # Compute the loss and backpropagate
-        loss = self.shared_model.criterion(predictions, targets_full)
+        loss = self.train_model.criterion(q_values, next_q_values)
 
         # Backpropagate the loss
-        self.shared_model.optimizer.zero_grad()
+        self.train_model.optimizer.zero_grad()
         loss.backward()
 
-        # Gradient clipping to avoid exploding gradients
-        # torch.nn.utils.clip_grad_norm_(self.shared_model.parameters(), max_norm=1)
-
         # Update the weights
-        self.shared_model.optimizer.step()
+        self.train_model.optimizer.step()
 
     def replay(self) -> None:
         """Samples and trains a batch from the shared memory."""
@@ -133,7 +128,7 @@ class Interpreter:
             return
 
         batch = random.sample(self.memory, self.batch_size)
-        states, actions, rewards, dones, next_states = zip(*batch)
+        states, actions, rewards, next_states, dones = zip(*batch)
 
         actions = torch.tensor(actions, dtype=torch.long)
         states = torch.stack(states)
@@ -151,77 +146,66 @@ class Interpreter:
         for batch in dataloader:
             self.train_step(batch)
 
-    def decay_epsilon(self) -> None:
-        """Decays epsilon after each episode."""
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay)
+    def gather_experience(self) -> Tuple[List, List, List]:
+        """Gathers and zips experiences from the environment."""
+        states: List[torch.Tensor] = self.env.snake_states
+        actions: List[int] = [self.act(state) for state in states]
+        rewards, dones, scores = self.env.step(actions)
+        next_states: List[torch.Tensor] = self.env.snake_states
+
+        # Zip the data into experiences
+        experiences = list(zip(states, actions, rewards, next_states, dones))
+        return experiences, scores, rewards
+
+    def train_epoch(self) -> Tuple[int, float, float]:
+        """Runs a single training epoch."""
+        best_score: int = 0
+        best_time: float = 0
+        total_rewards: float = 0
+        self.env.reset()
+        start_time: float = time.time()
+
+        while True:
+            experiences, scores, rewards = self.gather_experience()
+            total_rewards += sum(rewards)
+            self.cache(experiences)
+
+            if len(self.memory) > self.batch_size:
+                self.replay()
+
+            if self.gui:
+                self.gui.training_render(self.env.game_state)
+
+            if all(done for _, _, _, _, done in experiences):
+                self.decay_epsilon()
+                self.replay()
+
+                for score in scores:
+                    if score > best_score:
+                        best_score = score
+                elapsed_time = time.time() - start_time
+                if elapsed_time > best_time:
+                    best_time = elapsed_time
+                break
+
+        return best_score, best_time, total_rewards
+
 
     def train(self) -> None:
-        """
-        Trains the agent using the shared replay buffer.
-        """
+        """Trains the agent over multiple epochs."""
         best_score: int = 0
         best_time: float = 0
 
         for epoch in range(self.epochs):
-            self.env.reset()
-            total_reward: float = 0
-            start_time: float = time.time()
-
-            while True:
-                states: List[torch.Tensor] = self.env.snake_states
-                actions: List[int] = [
-                    self.select_action_epsilon_greedy(state)
-                    for state in states
-                ]
-                rewards, dones, scores = self.env.step(actions)
-                next_states: List[torch.Tensor] = self.env.snake_states
-
-                for i in range(len(self.env.snakes)):
-                    self.cache(
-                        states[i],
-                        actions[i],
-                        rewards[i],
-                        dones[i],
-                        next_states[i],
-                    )
-                if len(self.memory) > self.batch_size:
-                    self.replay()
-
-                if self.gui:
-                    self.gui.training_render(self.env.game_state)
-
-                if all(dones):
-                    self.decay_epsilon()
-                    for score in scores:
-                        if score > best_score:
-                            self.update_target_model()
-                            if (
-                                config.paths.models / "snake_best.pth"
-                            ).exists():
-                                (
-                                    config.paths.models / "snake_best.pth"
-                                ).unlink()
-                            self.target_model.save(
-                                config.paths.models / "snake_best.pth"
-                            )
-                            best_score = score
-                    if time.time() - start_time > best_time:
-                        best_time = time.time() - start_time
-                    print(
-                        f"Epoch {epoch + 1}/{self.epochs}, "
-                        f"Score: {scores}, "
-                        f"Best Score: {best_score}, "
-                        f"Best Time: {best_time:.2f}s"
-                    )
-                    break
+            epoch_score, epoch_time, rewards = self.train_epoch()
+            best_score = max(best_score, epoch_score)
+            best_time = max(best_time, epoch_time)
+            plotter.update(epoch, rewards, epoch_score, best_score, self.epsilon)
 
             if epoch % config.nn.training.update_frequency == 0:
                 self.update_target_model()
 
-            duration = time.time() - start_time
-            print(
-                f"Epoch {epoch + 1}/{self.epochs}, Reward: {total_reward}, Time: {duration:.2f}s"
-            )
+        plotter.close()
 
     @torch.no_grad()
     def evaluate(self, test_episodes: int = 10) -> None:
@@ -234,7 +218,7 @@ class Interpreter:
 
             while True:
                 states = self.env.snake_states
-                actions = [self.act(state) for state in states]
+                actions = [self.choose_action(state) for state in states]
                 rewards, dones, scores = self.env.step(actions)
                 total_reward += sum(rewards)
 
@@ -252,7 +236,7 @@ class Interpreter:
 
 if __name__ == "__main__":
     gui = None
-    # gui = PygameGUI(config)
+    gui = PygameGUI(config)
     env = Environment(config)
     plotter = Plotter()
     saved_model: Optional[Path] = config.paths.models / "snake_best.pth"
@@ -263,12 +247,12 @@ if __name__ == "__main__":
         gui=gui or None,
         env=env,
         plotter=plotter,
-        model_path=saved_model or None,
+        # model_path=saved_model or None,
     )
-    # try:
-    interpreter.train()
-    interpreter.evaluate()
-    # except KeyboardInterrupt:
-    #     pass
-    # except Exception as e:
-    #     print(e)
+    try:
+        interpreter.train()
+        interpreter.evaluate()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(e)

@@ -21,8 +21,6 @@ class DeepQSnakeAgent(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(input_size, 128),
             nn.LeakyReLU(0.01),
-            # nn.Linear(128, 64),
-            # nn.LeakyReLU(0.01),
             nn.Linear(128, output_size),
         )
         self.optimizer = torch.optim.Adam(
@@ -31,8 +29,8 @@ class DeepQSnakeAgent(nn.Module):
             amsgrad=True,
             weight_decay=1e-5
         )
-        # self.criterion = nn.MSELoss()
-        self.criterion = nn.SmoothL1Loss()
+
+        self.criterion = nn.SmoothL1Loss(beta=0.8)
         self.device = torch.device(
             "cuda"
             if torch.cuda.is_available() 
