@@ -1,12 +1,13 @@
 from pathlib import Path
 import time
 import random
-from typing import Optional
+from typing import Optional, List, Tuple
 from collections import deque
 
 import torch
+from torch.utils.data import DataLoader, TensorDataset
 
-from src.ui.base_gui import GUI
+from src.ui.pygame.pygame_gui import PygameGUI
 from src.utils.plotter import Plotter
 from src.ai.agent import DeepQSnakeAgent
 from src.game.environment import Environment
@@ -19,214 +20,239 @@ class Interpreter:
         config: Config,
         env: Environment,
         plotter: Plotter,
-        gui: Optional[GUI] = None,
+        gui: Optional[PygameGUI] = None,
         model_path: Optional[Path] = None,
     ) -> None:
         """
         Initializes the AI agent for Snake.
         Args:
             config (Config): Configuration settings.
-            gui (GUI): GUI for rendering the game.
+            env (Environment): Environment for the agent.
             plotter (Plotter): Plotter for visualizing training.
+            gui (GUI): GUI for rendering the game.
             model_path (str, optional): Path to load pre-trained model.
         """
         self.config: Config = config
-        self.gui: GUI | None = gui
+        self.gui: PygameGUI | None = gui
         self.env: Environment = env
         self.plotter: Plotter = plotter
+        # <-- Hyperparameters -->
         self.gamma: float = config.nn.training.gamma
         self.batch_size: int = config.nn.training.batch_size
         self.epochs: int = config.nn.training.epochs
         self.decay: float = config.nn.training.exploration.decay
+        self.epsilon = config.nn.training.exploration.epsilon
         self.epsilon_min: float = config.nn.training.exploration.epsilon_min
-
-        # Initialize separate models and replay buffers for each snake
-        self.snakes_data = [
-            {
-                "model": DeepQSnakeAgent(env.snake_state_size, 4, config),
-                "goal_model": DeepQSnakeAgent(env.snake_state_size, 4, config),
-                "memory": deque(maxlen=100_000),
-                "epsilon": config.nn.training.exploration.epsilon,
-            }
-            for _ in range(len(env.snakes))
-        ]
-
+        # <-- Models -->
+        self.train_model = DeepQSnakeAgent(env.snake_state_size, 4, config)
+        self.target_model = DeepQSnakeAgent(env.snake_state_size, 4, config)
+        self.memory = deque(maxlen=100_000)
         # Load pre-trained model if provided
         if model_path:
-            for snake_data in self.snakes_data:
-                snake_data["model"].load(model_path)
+            self.train_model.load(model_path)
+            self.target_model.load_state_dict(self.train_model.state_dict())
 
-        self.update_target_models()
+    # <-- Model Utils -->
+    def update_target_model(self) -> None:
+        """Updates the target model from the shared model."""
+        self.target_model.load_state_dict(self.train_model.state_dict())
 
-    def update_target_models(self) -> None:
-        """
-        Updates the target models for all snakes.
-        """
-        for snake_data in self.snakes_data:
-            snake_data["goal_model"].load_state_dict(snake_data["model"].state_dict())
+    def move_to_device(self, batch: List[torch.Tensor]) -> List[torch.Tensor]:
+        """Moves a batch of tensors to the device."""
+        return [data.to(self.train_model.device) for data in batch]
 
-    def remember(self, snake_data, state, action, reward, next_state, done) -> None:
-        """
-        Stores an experience in the replay buffer for a specific snake.
-        """
-        snake_data["memory"].append((state, action, reward, next_state, done))
+    def cache(self, experiences: List[Tuple]) -> None:
+        """Stores an experience in the shared replay cache."""
+        self.memory.extend(experiences)
 
-    def act(self, state, snake_data) -> list[int]:
-        """
-        Chooses an action for a specific snake based on epsilon-greedy strategy.
-        """
-        movement: list[int] = [0] * 4
-        if random.random() < snake_data["epsilon"]:
-            move: int = random.randrange(4)
-        else:
-            state_tensor = torch.tensor(state, dtype=torch.float).unsqueeze(0)
-            q_values = snake_data["model"](state_tensor)
-            move = int(torch.argmax(q_values).item())
-        movement[move] = 1
-        return movement
+    def decay_epsilon(self) -> None:
+        """Decays epsilon after each episode."""
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.decay)
 
-    def train_step(self, snake_data, batch) -> None:
-        """
-        Performs a training step for a specific snake using a batch of experiences.
-        """
-        states, actions, rewards, next_states, dones = batch
+    def save_model(self, path: str | Path) -> None:
+        """Saves the model to a specified file."""
+        self.train_model.save(path)
+    # <-- Training -->
+    def act(self, state: torch.Tensor):
+        """Chooses an action based on epsilon-greedy strategy."""
+        if random.random() >= self.epsilon:
+            return self.choose_action(state)
+        return random.randrange(4)
 
-        # Convert inputs to tensors
-        state = torch.tensor(states, dtype=torch.float)
-        next_state = torch.tensor(next_states, dtype=torch.float)
-        action = torch.tensor(actions, dtype=torch.long)
-        reward = torch.tensor(rewards, dtype=torch.float)
+    def choose_action(self, state: torch.Tensor):
+        """Chooses an action using the shared model."""
+        state_tensor: torch.Tensor = state.unsqueeze(0)
+        with torch.no_grad():
+            q_values = self.train_model(state_tensor)
+        return int(torch.argmax(q_values, dim=1).item())
 
-        if len(state.shape) == 1:
-            state = state.unsqueeze(0)
-            next_state = next_state.unsqueeze(0)
-            action = action.unsqueeze(0)
-            reward = reward.unsqueeze(0)
-            dones = (dones,)
+    def train_step(self, batch) -> None:
+        """Training step using a batch of experiences from cache."""
+        state, action, reward, done, next_state = self.move_to_device(batch)
 
-        predictions = snake_data["model"](state)
-        targets_full = predictions.clone()
+        # Reward clipping
+        reward = torch.clamp(reward, -1, 1)
 
-        for idx in range(len(dones)):
-            q_new = reward[idx]
-            if not dones[idx]:
-                q_new = reward[idx] + self.gamma * torch.max(
-                    snake_data["goal_model"](next_state[idx])
-                )
+        # Get the Q-values for the current states
+        q_values = self.train_model(state)
 
-            targets_full[idx][torch.argmax(action[idx]).item()] = q_new
+        # Get the Q-values for the next states
+        next_q_values = q_values.clone().detach().requires_grad_(False)
 
-        snake_data["model"].optimizer.zero_grad()
-        loss = snake_data["model"].criterion(targets_full, predictions)
+        # Compute the Q-values for the next states
+        with torch.no_grad():
+            # No gradient calculation for the target model since
+            # we are not training it. We just use it to get the
+            # Q-values for the next states. That way it does not
+            # affect the gradients of the training model.
+            q_next = self.target_model(next_state).max(dim=1).values
+
+        # Apply the Bellman equation
+        q_new = reward + (1 - done) * self.gamma * q_next
+
+        next_q_values[range(self.batch_size), action] = q_new
+
+        # Compute the loss and backpropagate
+        loss = self.train_model.criterion(q_values, next_q_values)
+
+        # Backpropagate the loss
+        self.train_model.optimizer.zero_grad()
         loss.backward()
-        snake_data["model"].optimizer.step()
 
-    def replay(self, snake_data) -> None:
-        """
-        Samples a batch from the memory of a specific snake and trains its model.
-        """
-        if len(snake_data["memory"]) < self.batch_size:
+        # Update the weights
+        self.train_model.optimizer.step()
+
+    def replay(self) -> None:
+        """Samples and trains a batch from the shared memory."""
+        if len(self.memory) < self.batch_size:
             return
-        batch = random.sample(snake_data["memory"], self.batch_size)
-        self.train_step(snake_data, zip(*batch))
 
-    def decay_epsilon(self, snake_data) -> None:
-        """
-        Decays epsilon for a specific snake after each episode.
-        """
-        snake_data["epsilon"] = max(self.epsilon_min, snake_data["epsilon"] * self.decay)
+        batch = random.sample(self.memory, self.batch_size)
+        states, actions, rewards, next_states, dones = zip(*batch)
+
+        actions = torch.tensor(actions, dtype=torch.long)
+        states = torch.stack(states)
+        next_states = torch.stack(next_states)
+        rewards = torch.stack(rewards)
+        dones = torch.stack(dones)
+
+        dataset = TensorDataset(states, actions, rewards, dones, next_states)
+        dataloader = DataLoader(
+            dataset=dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+        )
+
+        for batch in dataloader:
+            self.train_step(batch)
+
+    def gather_experience(self) -> Tuple[List, List, List]:
+        """Gathers and zips experiences from the environment."""
+        states: List[torch.Tensor] = self.env.snake_states
+        actions: List[int] = [self.act(state) for state in states]
+        rewards, dones, scores = self.env.step(actions)
+        next_states: List[torch.Tensor] = self.env.snake_states
+
+        # Zip the data into experiences
+        experiences = list(zip(states, actions, rewards, next_states, dones))
+        return experiences, scores, rewards
+
+    def train_epoch(self) -> Tuple[int, float, float]:
+        """Runs a single training epoch."""
+        best_score: int = 0
+        best_time: float = 0
+        total_rewards: float = 0
+        self.env.reset()
+        start_time: float = time.time()
+
+        while True:
+            experiences, scores, rewards = self.gather_experience()
+            total_rewards += sum(rewards)
+            self.cache(experiences)
+
+            if len(self.memory) > self.batch_size:
+                self.replay()
+
+            if self.gui:
+                self.gui.training_render(self.env.game_state)
+
+            if all(done for _, _, _, _, done in experiences):
+                self.decay_epsilon()
+                self.replay()
+
+                for score in scores:
+                    if score > best_score:
+                        best_score = score
+                elapsed_time = time.time() - start_time
+                if elapsed_time > best_time:
+                    best_time = elapsed_time
+                break
+
+        return best_score, best_time, total_rewards
+
 
     def train(self) -> None:
-        """
-        Trains the agent using the replay buffers of each snake.
-        """
+        """Trains the agent over multiple epochs."""
         best_score: int = 0
         best_time: float = 0
 
         for epoch in range(self.epochs):
+            epoch_score, epoch_time, rewards = self.train_epoch()
+            best_score = max(best_score, epoch_score)
+            best_time = max(best_time, epoch_time)
+            plotter.update(epoch, rewards, epoch_score, best_score, self.epsilon)
+
+            if epoch % config.nn.training.update_frequency == 0:
+                self.update_target_model()
+
+        plotter.close()
+
+    @torch.no_grad()
+    def evaluate(self, test_episodes: int = 10) -> None:
+        """
+        Evaluates the agent's performance over multiple episodes without training.
+        """
+        for i in range(test_episodes):
             self.env.reset()
             total_reward: float = 0
-            start_time: float = time.time()
 
             while True:
                 states = self.env.snake_states
-                actions = [self.act(state, snake_data) for state, snake_data in zip(states, self.snakes_data)]
+                actions = [self.choose_action(state) for state in states]
                 rewards, dones, scores = self.env.step(actions)
-                next_states = self.env.snake_states
-
-                for i, snake in enumerate(self.env.snakes):
-                    snake_data = self.snakes_data[i]
-                    self.remember(snake_data, states[i], actions[i], rewards[i], next_states[i], dones[i])
-                    if len(snake_data["memory"]) >= self.batch_size:
-                        self.replay(snake_data)
-
                 total_reward += sum(rewards)
 
                 if self.gui:
-                    self.gui.render(self.env)
+                    self.gui.training_render(self.env.game_state)
 
                 if all(dones):
-                    for snake_data in self.snakes_data:
-                        self.decay_epsilon(snake_data)
-                    for score in scores:
-                        if score > best_score:
-                            # Save the best model
-                            for i, snake_data in enumerate(self.snakes_data):
-                                snake_data["model"].save(config.paths.models / f"snake_{i}_best.pth")
-                            best_score = score
-                    if time.time() - start_time > best_time:
-                        best_time = time.time() - start_time
                     print(
-                        f"Epoch {epoch + 1}/{self.epochs}, "
-                        f"Score: {scores}, "
-                        f"Best Score: {best_score}, "
-                        f"Best Time: {best_time:.2f}s"
+                        f"Episode {i + 1}/{test_episodes}, "
+                        f"Reward: {total_reward}, "
+                        f"Score: {sum(scores)}"
                     )
                     break
-                # time.sleep(.1)
-
-            duration = time.time() - start_time
-            print(f"Epoch {epoch + 1}/{self.epochs}, Reward: {total_reward}, Time: {duration:.2f}s")
-
-    def evaluate(self) -> None:
-        """
-        Evaluates the agent's performance over multiple episodes.
-        Makes the agent play without training.
-        """
-        while True:
-            self.env.reset()
-            total_reward: float = 0
-            start_time: float = time.time()
-
-            while True:
-                states = self.env.snake_states
-                actions = [self.act(state, snake_data) for state, snake_data in zip(states, self.snakes_data)]
-                rewards, dones, _ = self.env.step(actions)
-                total_reward += sum(rewards)
-
-                if self.gui:
-                    self.gui.render(self.env)
-
-                if all(dones):
-                    break
-                time.sleep(.1)
-
-            duration = time.time() - start_time
-            print(f"Reward: {total_reward}, Time: {duration:.2f}s")
-
-
 
 
 if __name__ == "__main__":
-    gui = GUI(config)
+    gui = None
+    gui = PygameGUI(config)
     env = Environment(config)
     plotter = Plotter()
-    saved_model: Path = config.paths.models / "snake_0_best.pth"
+    saved_model: Optional[Path] = config.paths.models / "snake_best.pth"
+    if not saved_model.exists():
+        saved_model = None
     interpreter = Interpreter(
         config=config,
-        gui=gui,
+        gui=gui or None,
         env=env,
         plotter=plotter,
-        model_path=saved_model
+        # model_path=saved_model or None,
     )
-    interpreter.evaluate()
+    try:
+        interpreter.train()
+        interpreter.evaluate()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(e)

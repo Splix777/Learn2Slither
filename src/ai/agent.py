@@ -29,7 +29,8 @@ class DeepQSnakeAgent(nn.Module):
             amsgrad=True,
             weight_decay=1e-5
         )
-        self.criterion = nn.MSELoss()
+
+        self.criterion = nn.SmoothL1Loss(beta=0.8)
         self.device = torch.device(
             "cuda"
             if torch.cuda.is_available() 

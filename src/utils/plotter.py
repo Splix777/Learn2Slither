@@ -1,60 +1,102 @@
 import matplotlib.pyplot as plt
+from typing import List
 
 class Plotter:
-    def __init__(self):
+    def __init__(self) -> None:
         """
-        Initializes the Plotter with empty lists for data tracking.
+        Initializes the Plotter with empty lists for data tracking and sets up the interactive plot.
         """
-        self.episodes = []
-        self.rewards = []
-        self.scores = []
-        self.epsilons = []
+        self.episodes: List[int] = []
+        self.rewards: List[float] = []
+        self.scores: List[int] = []
+        self.top_score: List[int] = []
+        self.epsilons: List[float] = []
 
-    def update(self, episode, reward, score, epsilon):
+        # Set up the interactive plot
+        plt.ion()
+        self.fig, self.axs = plt.subplots(1, 4, figsize=(20, 5))
+        self.fig.suptitle("Training Progress", fontsize=16)
+
+        # Subplot for rewards
+        self.axs[0].set_title("Rewards Over Episodes")
+        self.axs[0].set_xlabel("Episodes")
+        self.axs[0].set_ylabel("Total Reward")
+        self.axs[0].grid()
+
+        # Subplot for scores
+        self.axs[1].set_title("Scores Over Episodes")
+        self.axs[1].set_xlabel("Episodes")
+        self.axs[1].set_ylabel("Score")
+        self.axs[1].grid()
+
+        # Subplot for Top Score
+        self.axs[3].set_title("Top Score Over Episodes")
+        self.axs[3].set_xlabel("Episodes")
+        self.axs[3].set_ylabel("Top Score")
+        self.axs[3].grid()
+
+        # Subplot for epsilon
+        self.axs[2].set_title("Epsilon Decay")
+        self.axs[2].set_xlabel("Episodes")
+        self.axs[2].set_ylabel("Epsilon")
+        self.axs[2].grid()
+
+    def update(self, episode: int, reward: float, score: int, top_score: int , epsilon: float) -> None:
         """
-        Updates the plot data for the current episode.
+        Updates the plot data and redraws the plot.
         Args:
             episode (int): Current episode number.
             reward (float): Total reward for the episode.
             score (int): Final score for the episode.
             epsilon (float): Current epsilon value.
         """
+        # Append new data
         self.episodes.append(episode)
         self.rewards.append(reward)
         self.scores.append(score)
+        self.top_score.append(top_score)
         self.epsilons.append(epsilon)
-        self.plot()
 
-    def plot(self):
+        # Update each subplot
+        # Clear the Rewards subplot
+        self.axs[0].cla()
+        self.axs[0].plot(self.episodes, self.rewards, label="Total Reward", color="blue")
+        self.axs[0].set_title("Rewards Over Episodes")
+        self.axs[0].set_xlabel("Episodes")
+        self.axs[0].set_ylabel("Total Reward")
+        self.axs[0].grid()
+
+        # Clear the Scores subplot
+        self.axs[1].cla()
+        self.axs[1].plot(self.episodes, self.scores, label="Score", color="orange")
+        self.axs[1].set_title("Scores Over Episodes")
+        self.axs[1].set_xlabel("Episodes")
+        self.axs[1].set_ylabel("Score")
+        self.axs[1].grid()
+
+        # Clear the Top Score subplot
+        self.axs[2].cla()
+        self.axs[2].plot(self.episodes, self.top_score, label="Top Score", color="red")
+        self.axs[2].set_title("Top Score Over Episodes")
+        self.axs[2].set_xlabel("Episodes")
+        self.axs[2].set_ylabel("Top Score")
+        self.axs[2].grid()
+
+        # Clear the Epsilon subplot
+        self.axs[3].cla() 
+        self.axs[3].plot(self.episodes, self.epsilons, label="Epsilon", color="green")
+        self.axs[3].set_title("Epsilon Decay")
+        self.axs[3].set_xlabel("Episodes")
+        self.axs[3].set_ylabel("Epsilon")
+        self.axs[3].grid()
+
+        # Redraw the figure
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+    def close(self) -> None:
         """
-        Plots the current progress.
+        Closes the interactive plot window.
         """
-        plt.figure(figsize=(12, 6))
-        plt.clf()
-
-        # Plot Total Rewards
-        plt.subplot(1, 3, 1)
-        plt.plot(self.episodes, self.rewards, label="Total Reward")
-        plt.xlabel("Episodes")
-        plt.ylabel("Total Reward")
-        plt.title("Rewards Over Episodes")
-        plt.grid()
-
-        # Plot Scores
-        plt.subplot(1, 3, 2)
-        plt.plot(self.episodes, self.scores, label="Score", color="orange")
-        plt.xlabel("Episodes")
-        plt.ylabel("Score")
-        plt.title("Scores Over Episodes")
-        plt.grid()
-
-        # Plot Epsilon
-        plt.subplot(1, 3, 3)
-        plt.plot(self.episodes, self.epsilons, label="Epsilon", color="green")
-        plt.xlabel("Episodes")
-        plt.ylabel("Epsilon")
-        plt.title("Epsilon Decay")
-        plt.grid()
-
-        plt.tight_layout()
-        plt.pause(0.1)
+        plt.ioff()  # Turn off interactive mode
+        plt.show()  # Ensure the window doesn't close immediately when training ends
