@@ -34,9 +34,6 @@ class Snake:
 
     def init(self, start_pos: Tuple[int, int], start_dir: Direction):
         """Initialize the snake body."""
-        self.head = start_pos
-        self.body.append(self.head)
-        self.movement_direction = start_dir
         for body in range(1, self.size):
             segment_offset: Tuple[int, int] = (
                 body * self.movement_direction.value[0],
@@ -66,14 +63,7 @@ class Snake:
 
     # <-- Movement methods -->
     def snake_controller(self, direction: List[int] | int) -> None:
-        """
-        Change the snake's movement direction. Suppresses ValueError
-        if the new direction is the opposite of the current direction
-        or if the new direction is invalid.
-
-        Args:
-            direction (List[int] | int): The new direction of the snake.
-        """
+        """Change the snake's movement direction."""
         new_direction: Direction = self.movement_direction
 
         if isinstance(direction, list):
@@ -128,15 +118,8 @@ class Snake:
         self.reward = 0
 
     def update_reward(self, event: str, reward: int) -> None:
-        """
-        Update the snake's reward based on the event.
-
-        Args:
-            event (str): The event that occurred.
-            reward (int): The reward to add.
-        """
+        """Update the snake's reward based on the event."""
         if event in {"death", "green_apple", "red_apple", "looping"}:
-            # print(f"Snake {self.id} - Event: {event} - Reward: {reward}")
             self.reward = reward
 
     def delete(self) -> None:

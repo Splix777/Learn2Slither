@@ -34,7 +34,6 @@ class Environment:
         starting_pos = self._starting_positions()
         for index, (dir, pos) in enumerate(starting_pos.items()):
             self.snakes[index].reset(pos, dir)
-        print(starting_pos)
         self.green_apples = []
         self.red_apples = []
         self.draw_map()
@@ -42,11 +41,11 @@ class Environment:
     # <-- Map Creation and Rendering -->
     def draw_map(self) -> None:
         """Create a map with the given configuration."""
-        empty_map: List[List[str]] = self._create_blank_map()
+        rendered_map: List[List[str]] = self._create_blank_map()
         self._render_snakes(empty_map)
         self._add_apples(empty_map)
         self._render_apples(empty_map)
-        self.map = empty_map
+        self.map = rendered_map
 
     def _create_blank_map(self) -> List[List[str]]:
         """Create a blank map with the given configuration."""
@@ -204,31 +203,44 @@ class Environment:
             snake.update_reward(event, event_rewards[event])
     # < ------------------------------------->
 
-    def train_step(self, snake: Snake):
-        """Perform one step in the game based on the chosen action."""
-        snake.reset_reward()
-        state = self.get_state(snake)
-        action = snake.move(state, learn=True)
-        next_state = self.get_state(snake)
-        collision_event = self.check_collision(snake)
-        apple_event = self.check_apple_eaten(snake)
-        looping_event = self.check_looping(snake)
-        if collision_event or apple_event or looping_event:
-            self._update_snake_rewards(
-                snake,
-                collision_event or apple_event or looping_event
-            )
+    # <-- Game Steps -->
+    def train_step(self):
+        """Perform one step in the game for all snakes, ensuring proper next-step views."""
+        buffer = {}
+        for index, snake in enumerate(self.snakes):
+            snake.reset_reward()
+            state = self.get_state(snake)
+            action = snake.move(state, learn=True)
 
-        if snake.brain:
-            snake.brain.cache((
-                state,
-                action,
-                torch.tensor([snake.reward], dtype=torch.float),
-                next_state,
-                torch.tensor([not snake.alive], dtype=torch.float)
-            ))
+            event = self._check_events(snake)
+            if event:
+                self._update_snake_rewards(snake, event)
+
+            buffer[index] = (state, action, snake.reward, not snake.alive)
+
+        next_states = [self.get_state(snake) for snake in self.snakes]
+
+        for index, snake in enumerate(self.snakes):
+            if snake.brain:
+                state, action, reward, done = buffer[index]
+                next_state = next_states[index]
+                snake.brain.cache((
+                    state,
+                    action,
+                    torch.tensor([reward], dtype=torch.float),
+                    next_state,
+                    torch.tensor([done], dtype=torch.float)
+                ))
 
         self.draw_map()
+
+    def _check_events(self, snake):
+        events = [
+            self.check_collision(snake),
+            self.check_apple_eaten(snake),
+            self.check_looping(snake),
+        ]
+        return next((event for event in events if event), None)
 
     def step(self) -> None:
         """Perform one step in the game based on the chosen action."""
@@ -239,6 +251,7 @@ class Environment:
             self.check_looping(snake)
 
         self.draw_map()
+    # < ------------------------------------->
 
     # <-- Snake States Getters -->
     def get_state(self, snake: "Snake") -> torch.Tensor:

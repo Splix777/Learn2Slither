@@ -17,12 +17,10 @@ map:
     height: 30
   green_apples: 20
   red_apples: 5
-  # snakes: 1
 
 snake:
   start_color: blue
   start_size: 3
-
 
 visual:
   modes:
