@@ -16,7 +16,7 @@ class ReinforcementLearner:
         self,
         config: Config,
         env: Environment,
-        # plotter: Plotter,
+        plotter: Plotter,
         gui: Optional[PygameGUI] = None,
     ) -> None:
         """
@@ -31,7 +31,7 @@ class ReinforcementLearner:
         self.config: Config = config
         self.gui: PygameGUI | None = gui
         self.env: Environment = env
-        # self.plotter: Plotter = plotter
+        self.plotter: Plotter = plotter
 
     # <-- Model Utils -->
     def train_epoch(self) -> Tuple[int, float, float]:
@@ -43,10 +43,9 @@ class ReinforcementLearner:
         start_time: float = time.time()
 
         while True:
-            for snake in self.env.snakes:
-                self.env.train_step(snake)
-                best_score = max(best_score, snake.size)
-                total_rewards += snake.reward
+            self.env.train_step()
+            best_score = max(best_score, max(snake.size for snake in self.env.snakes))
+            total_rewards += max(snake.reward for snake in self.env.snakes)
 
             for snake in self.env.snakes:
                 if snake.brain:
@@ -64,7 +63,7 @@ class ReinforcementLearner:
                 elapsed_time: float = time.time() - start_time
                 best_time = max(best_time, elapsed_time)
                 break
-            time.sleep(10)
+            time.sleep(0.1)
 
         return best_score, best_time, total_rewards
 
@@ -82,7 +81,7 @@ class ReinforcementLearner:
                 if snake.brain:
                     epsilon = min(epsilon, snake.brain.epsilon)
 
-            # plotter.update(epoch, rewards, epoch_score, best_score, epsilon)
+            plotter.update(epoch, rewards, epoch_score, best_score, epsilon)
 
             if epoch % config.nn.update_frequency == 0:
                 for snake in self.env.snakes:
@@ -91,7 +90,7 @@ class ReinforcementLearner:
                             config.paths.models / "snake_brain.pth"
                         )
 
-        # plotter.close()
+        plotter.close()
 
     @torch.no_grad()
     def evaluate(self, test_episodes: int = 10) -> None:
@@ -115,12 +114,13 @@ class ReinforcementLearner:
                         f"Max Score: {max_score}, "
                     )
                     break
-                time.sleep(0.2)
+
+                time.sleep(0.1)
 
 
 if __name__ == "__main__":
     gui = PygameGUI(config)
-    # plotter = Plotter()
+    plotter = Plotter()
     model_path = config.paths.models / "snake_0.pth"
 
     if not model_path.exists():
@@ -128,18 +128,14 @@ if __name__ == "__main__":
 
     # Shared brain for all snakes
     brain = Brain(config=config, model_path=model_path)
-
-    # Create 10 snakes with brains
     snakes = [Snake(id=i, brain=brain) for i in range(10)]
-
-
     env = Environment(config, snakes)
 
     interpreter = ReinforcementLearner(
         config=config,
         gui=gui or None,
         env=env,
-        # plotter=plotter,
+        plotter=plotter,
     )
     try:
         interpreter.train()
