@@ -7,8 +7,9 @@ import torch
 from src.ui.pygame.screens.screen import BaseScreen
 from src.config.settings import Config
 from src.game.environment import Environment
+from src.game.snake import Snake
 from src.ui.utils.texture_loader import TextureLoader
-from src.ai.agent import DeepQSnakeAgent
+from src.ai.agent import Brain
 
 
 class GameScreen(BaseScreen):
@@ -18,7 +19,7 @@ class GameScreen(BaseScreen):
         self.mode = mode
         self.requested_screen_size = None
         # Game state
-        self.env: Environment = Environment(self.config)
+        self.env: Optional[Environment] = None
         self.game_controller: Callable = lambda: None
         self.ai_controller: Callable = lambda: None
         self.bindings: dict[str, int] = {"w": 0, "s": 1, "a": 2, "d": 3}
@@ -66,11 +67,12 @@ class GameScreen(BaseScreen):
 
     def _handle_ai_movement(self, snake_index: int) -> None:
         """Handle AI movement based on the current state."""
-        ai_actions = self.get_ai_movement(
-            self.env.get_state_by_id(snake_index).tolist()
-        )
-        self.ai_controller(ai_actions)
-        self.env.process_human_turn()
+        if self.env:
+            ai_actions = self.get_ai_movement(
+                self.env.get_state_by_id(snake_index).tolist()
+            )
+            self.ai_controller(ai_actions)
+            self.env.step()
 
     def render(self, screen: pygame.Surface) -> None:
         """Render the current game state (environment)."""
@@ -88,17 +90,17 @@ class GameScreen(BaseScreen):
                         row_num * self.textures.texture_size,
                     ),
                 )
-
-        if not self.env.snakes[0].alive:
-            screen.blit(
-                self.game_over_text,
-                (
-                    screen.get_width() // 2
-                    - self.game_over_text.get_width() // 2,
-                    screen.get_height() // 2
-                    - self.game_over_text.get_height() // 2,
-                ),
-            )
+        if self.env:
+            if not self.env.snakes[0].alive:
+                screen.blit(
+                    self.game_over_text,
+                    (
+                        screen.get_width() // 2
+                        - self.game_over_text.get_width() // 2,
+                        screen.get_height() // 2
+                        - self.game_over_text.get_height() // 2,
+                    ),
+                )
 
     def request_screen_resize(self, new_size: tuple[int, int]) -> None:
         """Request a screen resize to the specified dimensions."""
@@ -131,12 +133,14 @@ class GameScreen(BaseScreen):
 
     def start_human_vs_ai_game(self) -> None:
         self._reconfigure(2, (20, 20))
-        self.game_controller = self.env.snakes[0].snake_controller
-        self.ai_controller = self.env.snakes[1].snake_controller
+        if self.env:
+            self.game_controller = self.env.snakes[0].snake_controller
+            self.ai_controller = self.env.snakes[1].snake_controller
 
     def start_ai_solo_game(self) -> None:
         self._reconfigure(1, (10, 10))
-        self.game_controller = self.env.snakes[0].snake_controller
+        if self.env:
+            self.game_controller = self.env.snakes[0].snake_controller
 
     def _reconfigure(self, snakes: int, dimensions: tuple[int, int]) -> None:
         self.config.map.snakes = snakes
@@ -149,8 +153,9 @@ class GameScreen(BaseScreen):
         self.request_screen_resize((width, height))
         self.pause = False
         self.exit = False
-        self.env = Environment(self.config)
-        self.agent = DeepQSnakeAgent(
+        snake_list = [Snake(i) for i in range(snakes)]
+        self.env = Environment(self.config, snake_list)
+        self.agent = Brain(
             input_size=self.env.snake_state_size,
             output_size=4,
             config=self.config,
