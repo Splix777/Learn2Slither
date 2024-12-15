@@ -64,7 +64,7 @@ class ReinforcementLearner:
                 elapsed_time: float = time.time() - start_time
                 best_time = max(best_time, elapsed_time)
                 break
-            # time.sleep(0.1)
+            time.sleep(10)
 
         return best_score, best_time, total_rewards
 
@@ -88,7 +88,7 @@ class ReinforcementLearner:
                 for snake in self.env.snakes:
                     if snake.brain:
                         snake.brain.save(
-                            config.paths.models / f"snake_{snake.id}.pth"
+                            config.paths.models / "snake_brain.pth"
                         )
 
         # plotter.close()

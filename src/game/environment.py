@@ -34,6 +34,7 @@ class Environment:
         starting_pos = self._starting_positions()
         for index, (dir, pos) in enumerate(starting_pos.items()):
             self.snakes[index].reset(pos, dir)
+        print(starting_pos)
         self.green_apples = []
         self.red_apples = []
         self.draw_map()
@@ -132,6 +133,13 @@ class Environment:
                 or map[nx][ny] != "empty"
             ):
                 return False
+            
+        for step in range(1, total_steps):
+            nx, ny = x - dx * step, y - dy * step
+            map[nx][ny] = "reserved"
+        for step in range(1, ahead_steps):
+            nx, ny = x + dx * step, y + dy * step
+            map[nx][ny] = "reserved"
 
         return True
     # < ------------------------------------->
@@ -414,36 +422,3 @@ class Environment:
         if self.map:
             for row in self.map:
                 print(" ".join([cell[:2] for cell in row]))
-
-    # <-- Properties -->
-    # @property
-    # def snakes_dead(self) -> torch.Tensor:
-    #     return torch.tensor(
-    #         [not snake.alive for snake in self.snakes],
-    #         dtype=torch.float
-    #     )
-
-    # @property
-    # def rewards(self) -> torch.Tensor:
-    #     return torch.tensor(
-    #         [snake.reward for snake in self.snakes],
-    #         dtype=torch.float)
-
-    # @property
-    # def snake_sizes(self) -> torch.Tensor:
-    #     return torch.tensor(
-    #         [snake.size for snake in self.snakes],
-    #         dtype=torch.float
-    #     )
-
-    # @property
-    # def snake_states(self) -> List[torch.Tensor]:
-    #     return [self.get_state(snake) for snake in self.snakes]
-
-    # @property
-    # def snake_state_size(self) -> int:
-    #     return len(self.snake_states[0]) if self.snakes else 0
-
-    # @property
-    # def game_state(self) -> List[List[str]]:
-    #     return self.map
