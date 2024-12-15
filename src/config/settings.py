@@ -28,12 +28,12 @@ class BoardSize(BaseModel):
     """Board size configuration model."""
     width: int = Field(
         ge=10,
-        le=20,
+        le=100,
         description="Board width must be greater or equal to 10",
     )
     height: int = Field(
         ge=10,
-        le=20,
+        le=100,
         description="Board height must be greater or equal to 10",
     )
 
@@ -47,11 +47,11 @@ class MapConfig(BaseModel):
     red_apples: int = Field(
         gt=0, description="Starting red apples must be greater than 0"
     )
-    snakes: int = Field(
-        gt=0,
-        le=2,
-        description="Starting snakes must be greater than 0 and less than 3",
-    )
+    # snakes: int = Field(
+    #     gt=0,
+    #     le=2,
+    #     description="Starting snakes must be greater than 0 and less than 3",
+    # )
 
 
 class SnakeConfig(BaseModel):
@@ -140,20 +140,16 @@ class ExplorationConfig(BaseModel):
     epsilon_min: float
 
 
-class TrainingConfig(BaseModel):
-    """Training configuration model."""
+class NeuralNetworkConfig(BaseModel):
+    """Neural network configuration model."""
     batch_size: int
     epochs: int
     learning_rate: float
     exploration: ExplorationConfig
     gamma: float
     update_frequency: int
-
-
-class NeuralNetworkConfig(BaseModel):
-    """Neural network configuration model."""
-    training: TrainingConfig
-
+    input_shape: int
+    output_shape: int
 
 class PathsConfig(BaseModel):
     """Paths configuration model."""

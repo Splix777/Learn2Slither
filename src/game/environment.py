@@ -1,66 +1,56 @@
 import random
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from itertools import product
 import torch
 
 from src.game.snake import Snake
 from src.config.settings import Config
 from src.game.models.directions import Direction
-from src.game.models.starting_positions import StartingPositions
 
 
 class Environment:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, snakes: List[Snake]):
         self.config: Config = config
         # <-- Map Dimensions -->
         self.height: int = config.map.board_size.height
         self.width: int = config.map.board_size.width
         # <-- Apples -->
-        self.current_red_apples: int = 0
-        self.current_green_apples: int = 0
+        self.red_apples: List[Tuple[int, int]] = []
+        self.green_apples: List[Tuple[int, int]] = []
         self.max_red_apples: int = config.map.red_apples
         self.max_green_apples: int = config.map.green_apples
         # <-- Snakes -->
-        self.num_snakes: int = config.map.snakes
-        self.starting_positions = StartingPositions((self.height, self.width))
+        self.num_snakes: int = len(snakes)
         # <-- Initialize Map -->
-        self.map: List[List[str]] = self.make_map()
-        self.snakes: List[Snake] = self.create_snakes(config.snake.start_size)
-        self.add_apples()
+        self.snakes: List[Snake] = snakes
+        self.map: List[List[str]] = []
+        self.reset()
 
     def __repr__(self) -> str:
         return f"Enviroment - Height: {self.height} - Width: {self.width}"
 
-    # <-- Map generation methods -->
-    def make_map(self) -> List[List[str]]:
+    def reset(self) -> None:
+        """Reset the game environment."""
+        starting_pos = self._starting_positions()
+        for index, (dir, pos) in enumerate(starting_pos.items()):
+            self.snakes[index].reset(pos, dir)
+        self.green_apples = []
+        self.red_apples = []
+        self.draw_map()
+
+    # <-- Map Creation and Rendering -->
+    def draw_map(self) -> None:
         """Create a map with the given configuration."""
         empty_map: List[List[str]] = self._create_blank_map()
-        self._add_walls(empty_map)
-        return empty_map
-
-    def create_snakes(self, size: int = 3) -> List[Snake]:
-        """Create snakes for the game."""
-        snakes: List[Snake] = []
-        for snake_num in range(self.num_snakes):
-            snake = Snake(
-                id=snake_num,
-                size=size,
-                start_pos=self.starting_positions.positions[snake_num],
-                start_dir=self.starting_positions.directions[snake_num],
-            )
-            if not self.snake_valid_position(snake):
-                raise ValueError("Snake not in valid position")
-            snakes.append(snake)
-            self.update_snake_position(snake=snake)
-
-        return snakes
+        self._render_snakes(empty_map)
+        self._add_apples(empty_map)
+        self._render_apples(empty_map)
+        self.map = empty_map
 
     def _create_blank_map(self) -> List[List[str]]:
         """Create a blank map with the given configuration."""
-        return [["empty"] * self.width for _ in range(self.height)]
+        game_map = [["empty"] * self.width for _ in range(self.height)]
 
-    def _add_walls(self, game_map: List[List[str]]) -> None:
-        """Add walls around the map borders."""
         for row, col in product(range(self.height), range(self.width)):
             if (
                 row == 0
@@ -70,89 +60,103 @@ class Environment:
             ):
                 game_map[row][col] = "wall"
 
-    def reset(self) -> None:
-        """Reset the game environment."""
-        self.map = self.make_map()
-        self.snakes = self.create_snakes(self.config.snake.start_size)
-        self.current_red_apples = 0
-        self.current_green_apples = 0
-        self.add_apples()
+        return game_map
 
-    # <-- Utility methods -->
-    def get_random_empty_coordinate(self) -> Tuple[int, int]:
+    def _find_empty_cell(self, game_map: List[List[str]]) -> Tuple[int, int]:
         """Get a random empty position on the map."""
         while True:
             x: int = random.randint(1, self.width - 2)
             y: int = random.randint(1, self.height - 2)
-            if self.map[y][x] == "empty":
+            if game_map[y][x] == "empty":
                 break
         return x, y
 
-    def snake_valid_position(self, snake: Snake) -> bool:
-        """Check if the snake is within the map bounds."""
-        return all(
-            1 <= segment[0] < self.height - 1
-            and 1 <= segment[1] < self.width - 1
-            and self.map[segment[0]][segment[1]] == "empty"
-            for segment in snake.body
-        )
+    def _render_snakes(self, game_map: List[List[str]]) -> None:
+        """Place the snakes on the map."""
+        for snake in self.snakes:
+            if snake.alive:
+                game_map[snake.head[0]][snake.head[1]] = "snake_head"
+                for segment in snake.body[1:]:
+                    game_map[segment[0]][segment[1]] = "snake_body"
 
-    # <-- Apple methods -->
-    def add_apples(self) -> None:
+    def _render_apples(self, game_map: List[List[str]]) -> None:
+        """Place apples on the map."""
+        for apple in self.green_apples:
+            game_map[apple[0]][apple[1]] = "green_apple"
+        for apple in self.red_apples:
+            game_map[apple[0]][apple[1]] = "red_apple"
+
+    def _add_apples(self, game_map: List[List[str]]) -> None:
         """Add apples to random empty spaces on the map."""
-        while self.current_green_apples < self.max_green_apples:
-            x, y = self.get_random_empty_coordinate()
-            self.map[y][x] = "green_apple"
-            self.current_green_apples += 1
+        while len(self.green_apples) < self.max_green_apples:
+            x, y = self._find_empty_cell(game_map)
+            self.green_apples.append((y, x))
 
-        while self.current_red_apples < self.max_red_apples:
-            x, y = self.get_random_empty_coordinate()
-            self.map[y][x] = "red_apple"
-            self.current_red_apples += 1
+        while len(self.red_apples) < self.max_red_apples:
+            x, y = self._find_empty_cell(game_map)
+            self.red_apples.append((y, x))
+    
+    def _starting_positions(self) -> Dict[Direction, Tuple[int, int]]:
+        starting_positions: Dict[Direction, Tuple[int, int]] = {}
+        starting_map = self._create_blank_map()
+        for _ in range(self.num_snakes):
+            while True:
+                x, y = self._find_empty_cell(starting_map)
+                direction = random.choice(list(Direction))
+                if self._has_space((x, y), starting_map, direction):
+                    starting_positions[direction] = (x, y)
+                    break
+
+        return starting_positions
+
+    def _has_space(self, pos: Tuple[int, int], map: List[List[str]], direction: Direction) -> bool:
+        x, y = pos
+        dx, dy = direction.value
+        total_steps = self.config.snake.start_size 
+        ahead_steps = 2 
+
+        for step in range(1, total_steps):
+            nx, ny = x - dx * step, y - dy * step
+            if (
+                not 0 <= nx < self.height 
+                or not 0 <= ny < self.width
+                or map[nx][ny] != "empty"
+            ):
+                return False
+
+        for step in range(1, ahead_steps):
+            nx, ny = x + dx * step, y + dy * step
+            if (
+                not 0 <= nx < self.height
+                or not 0 <= ny < self.width
+                or map[nx][ny] != "empty"
+            ):
+                return False
+
+        return True
+    # < ------------------------------------->
 
     # <-- Events -->
-    def check_collision(
-        self, snake: Snake, snakes: List[Snake]
-    ) -> str | None:
+    def check_collision(self, snake: Snake) -> str | None:
         """Check if the snake collided with a wall or another snake."""
         if self._collided_with_wall(snake):
-            self._delete_snake(snake)
+            snake.delete()
             return "death"
-        if self._collided_with_snake(snake, snakes):
-            self._delete_snake(snake)
+        if self._collided_with_snake(snake):
+            snake.delete()
             return "death"
         return None
-
-    def _collided_with_wall(self, snake: Snake) -> bool:
-        """Checks if the snake collided with a wall."""
-        return self.map[snake.head[0]][snake.head[1]] == "wall"
-
-    def _collided_with_snake(self, snake: Snake, snakes: List[Snake]) -> bool:
-        """Checks if the snake collided with another snake or itself."""
-        cell: str = self.map[snake.head[0]][snake.head[1]]
-        if cell not in ["snake_body", "snake_head"]:
-            return False
-        for other_snake in snakes:
-            if snake.head in other_snake.body and snake.id != other_snake.id:
-                other_snake.kills += 1
-        return True
-
-    def _delete_snake(self, snake: Snake) -> None:
-        """Delete a snake from the game."""
-        for segment in range(1, len(snake.body)):
-            self.map[snake.body[segment][0]][snake.body[segment][1]] = "empty"
-        snake.alive = False
-
+    
     def check_apple_eaten(self, snake: Snake) -> str | None:
         """Check if the snake ate an apple."""
         if self.map[snake.head[0]][snake.head[1]] == "green_apple":
-            self.current_green_apples -= 1
+            self.green_apples.remove(snake.head)
             snake.green_apples_eaten += 1
             snake.steps_without_food = 0
             snake.grow()
             return "green_apple"
         elif self.map[snake.head[0]][snake.head[1]] == "red_apple":
-            self.current_red_apples -= 1
+            self.red_apples.remove(snake.head)
             snake.red_apples_eaten += 1
             snake.steps_without_food = 0
             snake.shrink()
@@ -165,6 +169,20 @@ class Environment:
             return "looping"
         return None
 
+    def _collided_with_wall(self, snake: Snake) -> bool:
+        """Checks if the snake collided with a wall."""
+        return self.map[snake.head[0]][snake.head[1]] == "wall"
+
+    def _collided_with_snake(self, snake: Snake) -> bool:
+        """Checks if the snake collided with another snake or itself."""
+        cell: str = self.map[snake.head[0]][snake.head[1]]
+        if cell not in ["snake_body", "snake_head"]:
+            return False
+        for other_snake in self.snakes:
+            if snake.head in other_snake.body and snake.id != other_snake.id:
+                other_snake.kills += 1
+        return True
+
     def _update_snake_rewards(self, snake: Snake, event: str | None) -> None:
         """Update the snake's reward based on the event."""
         event_rewards: dict[str, int] = {
@@ -176,60 +194,43 @@ class Environment:
 
         if event in event_rewards:
             snake.update_reward(event, event_rewards[event])
+    # < ------------------------------------->
 
-    # <-- Snake Movement -->
-    def update_snake_position(self, snake: Snake) -> None:
-        """Update the snake's position on the map."""
-        if not snake.alive:
-            return
-
-        for segment in snake.body:
-            if segment == snake.head:
-                self.map[segment[0]][segment[1]] = "snake_head"
-            else:
-                self.map[segment[0]][segment[1]] = "snake_body"
-
-    def move_snake(self, snake: Snake) -> None:
-        """Move the snake in the current direction."""
-        empty_spaces: List[Tuple[int, int]] = snake.move()
-        snake.steps_without_food += 1
-        for space in empty_spaces:
-            self.map[space[0]][space[1]] = "empty"
-
-    def step(self, actions: List[List[int]] | List[int]) -> Tuple:
+    def train_step(self, snake: Snake):
         """Perform one step in the game based on the chosen action."""
-        [snake.reset_reward() for snake in self.snakes]
-        for snake, action in zip(self.snakes, actions):
-            snake.snake_controller(action)
-            self.move_snake(snake)
-            apple_event = self.check_apple_eaten(snake)
-            collision_event = self.check_collision(snake, self.snakes)
-            looping_event = self.check_looping(snake)
-            if collision_event or apple_event or looping_event:
-                self._update_snake_rewards(
-                    snake,
-                    collision_event or apple_event or looping_event
-                )
-            self.update_snake_position(snake)
+        snake.reset_reward()
+        state = self.get_state(snake)
+        action = snake.move(state, learn=True)
+        next_state = self.get_state(snake)
+        collision_event = self.check_collision(snake)
+        apple_event = self.check_apple_eaten(snake)
+        looping_event = self.check_looping(snake)
+        if collision_event or apple_event or looping_event:
+            self._update_snake_rewards(
+                snake,
+                collision_event or apple_event or looping_event
+            )
 
-        self.add_apples()
+        if snake.brain:
+            snake.brain.cache((
+                state,
+                action,
+                torch.tensor([snake.reward], dtype=torch.float),
+                next_state,
+                torch.tensor([not snake.alive], dtype=torch.float)
+            ))
 
-        return self.rewards, self.snakes_dead, self.snake_sizes
+        self.draw_map()
 
-    def process_human_turn(self) -> None:
+    def step(self) -> None:
         """Perform one step in the game based on the chosen action."""
-        [snake.reset_reward() for snake in self.snakes]
         for snake in self.snakes:
-            self.move_snake(snake)
-            apple_event = self.check_apple_eaten(snake)
-            collision_event = self.check_collision(snake, self.snakes)
-            if collision_event or apple_event:
-                self._update_snake_rewards(
-                    snake, collision_event or apple_event
-                )
-            self.update_snake_position(snake)
+            snake.move(self.get_state(snake))
+            self.check_collision(snake)
+            self.check_apple_eaten(snake)
+            self.check_looping(snake)
 
-        self.add_apples()
+        self.draw_map()
 
     # <-- Snake States Getters -->
     def get_state(self, snake: "Snake") -> torch.Tensor:
@@ -274,45 +275,26 @@ class Environment:
 
     def get_state_by_id(self, snake_id: int) -> torch.Tensor:
         """Get the state of a specific snake."""
+        if snake_id >= len(self.snakes):
+            raise ValueError("Snake ID out of range.")
         return self.get_state(self.snakes[snake_id])
 
-    # <-- Enhanced Features -->
     def target_distances(self, x: int, y: int, target: str) -> torch.Tensor:
         """Calculate normalized distances to the closest target."""
         distances = torch.ones(4, dtype=torch.float)
-        # directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
-
-        # for index, (dx, dy) in enumerate(directions):
-        #     steps = 0
-        #     while True:
-        #         nx, ny = x + steps * dx.item(), y + steps * dy.item()
-        #         if (
-        #             nx < 0
-        #             or ny < 0
-        #             or nx >= self.height
-        #             or ny >= self.width
-        #             or self.map[nx][ny] == "wall"
-        #         ):
-        #             break
-        #         if self.map[nx][ny] == target:
-        #             distances[index] = steps / max(self.width, self.height)
-        #             break
-        #         steps += 1
-
-        # return distances
 
         for index, direction in enumerate(Direction):
             dr, dc = direction.value
             for step in range(1, max(self.width, self.height)):
                 nx, ny = x + dr * step, y + dc * step
                 if not (0 <= nx < self.height and 0 <= ny < self.width):
-                    distances[index] = self._normalize(
+                    distances[index] = self.normalize(
                         step - 1,
                         max(self.width, self.height)
                     )
                     break
                 if self.map[nx][ny] == target:
-                    distances[index] = self._normalize(
+                    distances[index] = self.normalize(
                         step,
                         max(self.width, self.height)
                     )
@@ -323,20 +305,6 @@ class Environment:
     def assess_nearby_risks(self, x: int, y: int) -> torch.Tensor:
         """Detect immediate danger in the four cardinal directions."""
         danger = torch.zeros(4, dtype=torch.float)
-        # directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
-
-        # for index, (dx, dy) in enumerate(directions):
-        #     nx, ny = x + dx.item(), y + dy.item()
-        #     if (
-        #         nx < 0
-        #         or ny < 0
-        #         or nx >= self.height
-        #         or ny >= self.width
-        #         or self.map[nx][ny] in ["wall", "snake_body"]
-        #     ):
-        #         danger[index] = 1.0
-
-        # return danger
 
         for index, direction in enumerate(Direction):
             dr, dc = direction.value
@@ -437,58 +405,45 @@ class Environment:
 
         return open_ratios
 
-    # <-- State Utilities -->
-    def _normalize(self, value: int, max_value: int) -> float:
+    def normalize(self, value: int, max_value: int) -> float:
         """Normalize a value between 0 and 1."""
         return value / max_value if max_value != 0 else 0
 
+    def pretty_print_map(self) -> None:
+        """Print the game map in a human-readable format."""
+        if self.map:
+            for row in self.map:
+                print(" ".join([cell[:2] for cell in row]))
+
     # <-- Properties -->
-    @property
-    def snakes_dead(self) -> torch.Tensor:
-        return torch.tensor(
-            [not snake.alive for snake in self.snakes],
-            dtype=torch.float
-        )
+    # @property
+    # def snakes_dead(self) -> torch.Tensor:
+    #     return torch.tensor(
+    #         [not snake.alive for snake in self.snakes],
+    #         dtype=torch.float
+    #     )
 
-    @property
-    def rewards(self) -> torch.Tensor:
-        return torch.tensor(
-            [snake.reward for snake in self.snakes],
-            dtype=torch.float)
+    # @property
+    # def rewards(self) -> torch.Tensor:
+    #     return torch.tensor(
+    #         [snake.reward for snake in self.snakes],
+    #         dtype=torch.float)
 
-    @property
-    def snake_sizes(self) -> torch.Tensor:
-        return torch.tensor(
-            [snake.size for snake in self.snakes],
-            dtype=torch.float
-        )
+    # @property
+    # def snake_sizes(self) -> torch.Tensor:
+    #     return torch.tensor(
+    #         [snake.size for snake in self.snakes],
+    #         dtype=torch.float
+    #     )
 
-    @property
-    def snake_states(self) -> List[torch.Tensor]:
-        return [self.get_state(snake) for snake in self.snakes]
+    # @property
+    # def snake_states(self) -> List[torch.Tensor]:
+    #     return [self.get_state(snake) for snake in self.snakes]
 
-    @property
-    def snake_state_size(self) -> int:
-        return len(self.snake_states[0]) if self.snakes else 0
+    # @property
+    # def snake_state_size(self) -> int:
+    #     return len(self.snake_states[0]) if self.snakes else 0
 
-    @property
-    def game_state(self) -> List[List[str]]:
-        return self.map
-
-
-if __name__ == "__main__":
-    from src.config.settings import config
-
-    env = Environment(config)
-    print(env.snakes_dead)
-    print(env.rewards)
-    print(env.snake_sizes)
-    print(env.snake_states)
-
-    # take a step
-    env.process_human_turn()
-
-    print(env.snakes_dead)
-    print(env.rewards)
-    print(env.snake_sizes)
-    print(env.snake_states)
+    # @property
+    # def game_state(self) -> List[List[str]]:
+    #     return self.map

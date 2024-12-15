@@ -13,11 +13,11 @@ logging:
 
 map:
   board_size:
-    width: 10
-    height: 10
-  green_apples: 2
-  red_apples: 1
-  snakes: 1
+    width: 30
+    height: 30
+  green_apples: 20
+  red_apples: 5
+  # snakes: 1
 
 snake:
   start_color: blue
@@ -80,16 +80,17 @@ rules:
     max_score: 10
 
 nn:
-  training:
-    batch_size: 32
-    epochs: 50
-    learning_rate: 0.001
-    exploration:
-      epsilon: 0.99
-      decay: 0.95
-      epsilon_min: 0.00
-    gamma: 0.90
-    update_frequency: 10
+  batch_size: 32
+  epochs: 500
+  learning_rate: 0.001
+  exploration:
+    epsilon: 0.99
+    decay: 0.95
+    epsilon_min: 0.00
+  gamma: 0.90
+  update_frequency: 10
+  input_shape: 44
+  output_shape: 4
     
 paths:
   models: models
