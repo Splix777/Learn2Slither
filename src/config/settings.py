@@ -47,11 +47,6 @@ class MapConfig(BaseModel):
     red_apples: int = Field(
         gt=0, description="Starting red apples must be greater than 0"
     )
-    # snakes: int = Field(
-    #     gt=0,
-    #     le=2,
-    #     description="Starting snakes must be greater than 0 and less than 3",
-    # )
 
 
 class SnakeConfig(BaseModel):
@@ -116,6 +111,7 @@ class Events(BaseModel):
     green_apple: int
     red_apple: int
     looping: int
+    kill: int
 
 
 class WinConditionsConfig(BaseModel):
@@ -150,6 +146,9 @@ class NeuralNetworkConfig(BaseModel):
     update_frequency: int
     input_shape: int
     output_shape: int
+    memory_size: int
+    patience: int
+    min_delta: float
 
 class PathsConfig(BaseModel):
     """Paths configuration model."""

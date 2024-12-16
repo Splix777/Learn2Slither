@@ -34,7 +34,7 @@ class Direction(Enum):
     def one_hot(direction: "Direction") -> List[int]:
         """
         Returns the one-hot encoding for a direction.
-        
+
         Args:
             direction (Direction): The direction.
 
@@ -96,10 +96,10 @@ class Direction(Enum):
     def possible_directions(current: "Direction") -> List[int]:
         """Returns a binary list of valid directions excluding
         the opposite of the current.
-        
+
         Args:
             current (Direction): The current direction.
-        
+
         Returns:
             List[int]: A binary list of valid directions.
         """

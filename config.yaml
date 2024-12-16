@@ -13,10 +13,10 @@ logging:
 
 map:
   board_size:
-    width: 30
-    height: 30
-  green_apples: 20
-  red_apples: 5
+    width: 10
+    height: 10
+  green_apples: 2
+  red_apples: 1
 
 snake:
   start_color: blue
@@ -69,26 +69,30 @@ pygame_textures:
 rules:
   events:
     death: -10
-    green_apple: 5
+    green_apple: 10
     red_apple: -1
     looping: -10
-  steps_no_apple: 25
+    kill: 2
+  steps_no_apple: 20
   win_condition:
     condition: max_snake_size
     max_score: 10
 
 nn:
-  batch_size: 32
-  epochs: 500
+  batch_size: 128
+  epochs: 1_000
   learning_rate: 0.001
   exploration:
     epsilon: 0.99
     decay: 0.95
-    epsilon_min: 0.00
-  gamma: 0.90
-  update_frequency: 10
-  input_shape: 44
+    epsilon_min: 0.05
+  gamma: 0.95
+  update_frequency: 5
+  input_shape: 52
   output_shape: 4
+  memory_size: 200_000
+  patience: 100
+  min_delta: 0.001
     
 paths:
   models: models

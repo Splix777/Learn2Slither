@@ -8,6 +8,7 @@ from src.utils.plotter import Plotter
 from src.game.snake import Snake
 from src.ai.agent import Brain
 from src.game.environment import Environment
+from src.ai.utils.early_stop import EarlyStop
 from src.config.settings import Config, config
 
 
@@ -16,7 +17,7 @@ class ReinforcementLearner:
         self,
         config: Config,
         env: Environment,
-        plotter: Plotter,
+        plotter: Optional[Plotter] = None,
         gui: Optional[PygameGUI] = None,
     ) -> None:
         """
@@ -29,22 +30,25 @@ class ReinforcementLearner:
             model_path (str, optional): Path to load pre-trained model.
         """
         self.config: Config = config
-        self.gui: PygameGUI | None = gui
         self.env: Environment = env
-        self.plotter: Plotter = plotter
+        self.gui: PygameGUI | None = gui
+        self.plotter: Plotter | None = plotter
 
-    # <-- Model Utils -->
-    def train_epoch(self) -> Tuple[int, float, float]:
+    # Training
+    def train_epoch(self) -> Tuple[int, float, float, float]:
         """Runs a single training epoch."""
         best_score: int = 0
         best_time: float = 0
         total_rewards: float = 0
+        total_loss: float = 0
         self.env.reset()
         start_time: float = time.time()
 
         while True:
             self.env.train_step()
-            best_score = max(best_score, max(snake.size for snake in self.env.snakes))
+            best_score = max(
+                best_score, max(snake.size for snake in self.env.snakes)
+            )
             total_rewards += max(snake.reward for snake in self.env.snakes)
 
             for snake in self.env.snakes:
@@ -57,31 +61,47 @@ class ReinforcementLearner:
             if all(not snake.alive for snake in self.env.snakes):
                 for snake in self.env.snakes:
                     if snake.brain:
+                        total_loss += snake.brain.loss_value
                         snake.brain.replay()
                         snake.brain.decay_epsilon()
 
+                avg_loss = total_loss / len(self.env.snakes)
                 elapsed_time: float = time.time() - start_time
                 best_time = max(best_time, elapsed_time)
                 break
-            time.sleep(0.1)
 
-        return best_score, best_time, total_rewards
+            # time.sleep(0.1)
+
+        return best_score, best_time, total_rewards, avg_loss
 
     def train(self) -> None:
         """Trains the agent over multiple epochs."""
+        early_stop = EarlyStop(
+            patience=config.nn.patience, min_delta=config.nn.min_delta
+        )
         best_score: int = 0
         best_time: float = 0
         epsilon: float = self.config.nn.exploration.epsilon
 
         for epoch in range(self.config.nn.epochs):
-            epoch_score, epoch_time, rewards = self.train_epoch()
+            epoch_score, epoch_time, rewards, avg_loss = self.train_epoch()
             best_score = max(best_score, epoch_score)
             best_time = max(best_time, epoch_time)
+            self.print_epoch(epoch, best_score, best_time, rewards, avg_loss)
+
+            early_stop(avg_loss, self.env.snakes[0].brain)
+            if early_stop.early_stop:
+                print("Early stopping")
+                break
+
             for snake in self.env.snakes:
                 if snake.brain:
                     epsilon = min(epsilon, snake.brain.epsilon)
 
-            plotter.update(epoch, rewards, epoch_score, best_score, epsilon)
+            if self.plotter:
+                self.plotter.update(
+                    epoch, rewards, epoch_score, best_score, epsilon
+                )
 
             if epoch % config.nn.update_frequency == 0:
                 for snake in self.env.snakes:
@@ -90,20 +110,38 @@ class ReinforcementLearner:
                             config.paths.models / "snake_brain.pth"
                         )
 
-        plotter.close()
+        if self.plotter:
+            self.plotter.close()
+
+    def print_epoch(
+        self,
+        epoch: int,
+        best_score: int,
+        best_time: float,
+        rewards: float,
+        avg_loss: float,
+    ) -> None:
+        """Prints the epoch results."""
+        print(
+            f"Epoch {epoch + 1}/{self.config.nn.epochs}, "
+            f"Best Score: {best_score}, "
+            f"Best Time: {best_time:.2f}s, "
+            f"Total Rewards: {rewards}, "
+            f"Avg Loss: {avg_loss:.2f}"
+        )
 
     @torch.no_grad()
-    def evaluate(self, test_episodes: int = 10) -> None:
-        """
-        Evaluates the agent's performance over multiple episodes without training.
-        """
+    def evaluate(self, test_episodes: int = 5) -> None:
+        """Evaluates the agent's performance over multiple episodes."""
         for i in range(test_episodes):
             self.env.reset()
             max_score: int = 0
 
             while True:
                 self.env.step()
-                max_score = max(max_score, max(snake.size for snake in self.env.snakes))
+                max_score = max(
+                    max_score, max(snake.size for snake in self.env.snakes)
+                )
 
                 if self.gui:
                     self.gui.training_render(self.env.map)
@@ -115,28 +153,28 @@ class ReinforcementLearner:
                     )
                     break
 
-                time.sleep(0.1)
+                # time.sleep(0.1)
 
 
 if __name__ == "__main__":
     gui = PygameGUI(config)
-    plotter = Plotter()
-    model_path = config.paths.models / "snake_0.pth"
+    plotter = None
+    # plotter = Plotter()
+    model_path = config.paths.models / "snake_brain.pth"
 
     if not model_path.exists():
         model_path = None
 
-    # Shared brain for all snakes
-    brain = Brain(config=config, model_path=model_path)
-    snakes = [Snake(id=i, brain=brain) for i in range(10)]
-    env = Environment(config, snakes)
-
+    brain = Brain(config=config, path=model_path)
+    snakes = Snake(1, brain=brain, config=config)
+    env = Environment(config, [snakes])
     interpreter = ReinforcementLearner(
         config=config,
         gui=gui or None,
         env=env,
         plotter=plotter,
     )
+
     try:
         interpreter.train()
         interpreter.evaluate()

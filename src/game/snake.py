@@ -5,17 +5,19 @@ import torch
 
 from src.game.models.directions import Direction
 from src.ai.agent import Brain
+from src.config.settings import Config
 
 
 class Snake:
     def __init__(
         self,
         id: int,
-        size: int = 3,
+        config: Config,
         brain: Optional[Brain] = None,
     ) -> None:
         self.id: int = id
-        self.size: int = size
+        self.config: Config = config
+        self.size: int = config.snake.start_size
         self.brain: Optional[Brain] = brain
         self.alive: bool = True
         self.kills: int = 0
@@ -32,7 +34,24 @@ class Snake:
         """Return the snake's representation."""
         return f"Snake {self.id} - Size: {self.size} - Alive: {self.alive}"
 
-    def init(self, start_pos: Tuple[int, int], start_dir: Direction):
+    # Initialization
+    def initialize(self, start_pos: Tuple[int, int], start_dir: Direction) -> None:
+        """Reset the snake to its initial state."""
+        self.initialized = False
+        self.size = self.config.snake.start_size
+        self.alive = True
+        self.kills = 0
+        self.reward = 0
+        self.red_apples_eaten = 0
+        self.green_apples_eaten = 0
+        self.steps_without_food = 0
+        self.head = start_pos
+        self.body = [self.head]
+        self.movement_direction = start_dir
+        self.create_snake_body()
+        self.initialized = True
+
+    def create_snake_body(self) -> None:
         """Initialize the snake body."""
         for body in range(1, self.size):
             segment_offset: Tuple[int, int] = (
@@ -46,22 +65,7 @@ class Snake:
             self.body.append(snake_segment)
         self.initialized = True
 
-    def reset(self, start_pos: Tuple[int, int], start_dir: Direction) -> None:
-        """Reset the snake to its initial state."""
-        self.size = 3
-        self.alive = True
-        self.kills = 0
-        self.reward = 0
-        self.red_apples_eaten = 0
-        self.green_apples_eaten = 0
-        self.steps_without_food = 0
-        self.head = start_pos
-        self.body = [self.head]
-        self.movement_direction = start_dir
-        self.initialized = False
-        self.init(start_pos, start_dir)
-
-    # <-- Movement methods -->
+    # Movement methods
     def snake_controller(self, direction: List[int] | int) -> None:
         """Change the snake's movement direction."""
         new_direction: Direction = self.movement_direction
@@ -76,15 +80,18 @@ class Snake:
         if new_direction != self.movement_direction.opposite:
             self.movement_direction = new_direction
 
-    def move(self, state: Optional[torch.Tensor] = None, learn: bool = False) -> List[int]:
+    def move(
+        self, state: Optional[torch.Tensor] = None, learn: bool = False
+    ) -> List[int]:
         """Move the snake in the current direction."""
         if not self.alive:
             return Direction.one_hot(self.movement_direction)
-        
+
+        self.steps_without_food += 1
         if self.brain and state is not None:
             self.snake_controller(
-                self.brain.act(state) 
-                if learn 
+                self.brain.act(state)
+                if learn
                 else self.brain.choose_action(state)
             )
 
@@ -101,40 +108,51 @@ class Snake:
 
         return Direction.one_hot(self.movement_direction)
 
-    # <-- Size methods -->
-    def grow(self) -> None:
-        """Increase the snake's size by one."""
+    # Event methods
+    def eat_green_apple(self) -> None:
+        """Increase the snake's size and reward."""
         self.size += 1
+        self.green_apples_eaten += 1
+        self.reward = self.config.rules.events.green_apple
+        self.steps_without_food = 0
 
-    def shrink(self) -> None:
-        """Decrease the snake's size by one."""
+    def eat_red_apple(self) -> None:
+        """Decrease the snake's size and reward."""
         self.size -= 1
         if self.size == 0:
-            self.alive = False
+            self.death()
+        self.red_apples_eaten += 1
+        self.reward = self.config.rules.events.red_apple
+        self.steps_without_food = 0
 
-    # <-- Reward methods -->
-    def reset_reward(self) -> None:
-        """Reset the snake's reward."""
-        self.reward = 0
+    def looping(self) -> None:
+        """Apply the looping penalty to the snake."""
+        self.reward = self.config.rules.events.looping
 
-    def update_reward(self, event: str, reward: int) -> None:
-        """Update the snake's reward based on the event."""
-        if event in {"death", "green_apple", "red_apple", "looping"}:
-            self.reward = reward
+    def kill(self) -> None:
+        """Decrease the snake's size and reward."""
+        self.kills += 1
+        self.reward = self.config.rules.events.kill
 
-    def delete(self) -> None:
+    def death(self) -> None:
         """Delete the snake."""
+        self.head = (0, 0)
         self.body = []
         self.size = 0
         self.alive = False
+        self.reward = self.config.rules.events.death
 
-    # <-- Properties -->
+    def reset_rewards(self) -> None:
+        """Reset the snake's reward."""
+        self.reward = 0
+
+    # Properties
     @property
-    def direction_one_hot(self) -> List[int]:
+    def one_hot_direction(self) -> List[int]:
         """One-hot representation of snake's movement."""
         return Direction.one_hot(self.movement_direction)
 
     @property
-    def possible_directions_one_hot(self) -> List[int]:
+    def one_hot_options(self) -> List[int]:
         """One-hot representation of snake's possible movement."""
         return Direction.possible_directions(self.movement_direction)
