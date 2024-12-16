@@ -2,6 +2,8 @@ import time
 from typing import Optional, Tuple
 
 import torch
+import rich
+from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
 
 from src.ui.pygame.pygame_gui import PygameGUI
 from src.utils.plotter import Plotter
@@ -82,33 +84,69 @@ class ReinforcementLearner:
         best_score: int = 0
         best_time: float = 0
         epsilon: float = self.config.nn.exploration.epsilon
-
-        for epoch in range(self.config.nn.epochs):
-            epoch_score, epoch_time, rewards, avg_loss = self.train_epoch()
-            best_score = max(best_score, epoch_score)
-            best_time = max(best_time, epoch_time)
-            self.print_epoch(epoch, best_score, best_time, rewards, avg_loss)
-
-            early_stop(avg_loss, self.env.snakes[0].brain)
-            if early_stop.early_stop:
-                print("Early stopping")
-                break
-
-            for snake in self.env.snakes:
-                if snake.brain:
-                    epsilon = min(epsilon, snake.brain.epsilon)
-
-            if self.plotter:
-                self.plotter.update(
-                    epoch, rewards, epoch_score, best_score, epsilon
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            TextColumn("• Epoch: {task.fields[epoch]}"),
+            BarColumn(),
+            TextColumn("• Best Score: {task.fields[best_score]}"),
+            TextColumn("• Best Time: {task.fields[best_time]:.2f}s"),
+            TextColumn("• Total Rewards: {task.fields[total_rewards]:.2f}"),
+            TextColumn("• Avg Loss: {task.fields[avg_loss]:.2f}"),
+            TimeElapsedColumn(),
+        ) as progress:
+            task = progress.add_task(
+                "Training",
+                total=self.config.nn.epochs,
+                epoch=0,
+                best_score=0,
+                best_time=0,
+                total_rewards=0,
+                avg_loss=0,
+            )
+            for epoch in range(self.config.nn.epochs):
+                epoch_score, epoch_time, rewards, avg_loss = (
+                    self.train_epoch()
+                )
+                best_score = max(best_score, epoch_score)
+                best_time = max(best_time, epoch_time)
+                progress.update(
+                    task,
+                    advance=1,
+                    epoch=epoch + 1,
+                    best_score=best_score,
+                    best_time=best_time,
+                    total_rewards=rewards,
+                    avg_loss=avg_loss,
                 )
 
-            if epoch % config.nn.update_frequency == 0:
+                early_stop(avg_loss, self.env.snakes[0].brain)
+                if early_stop.early_stop:
+                    progress.update(
+                        task,
+                        description="Early Stopping Detected",
+                        epoch=epoch + 1,
+                        best_score=best_score,
+                        best_time=best_time,
+                        total_rewards=rewards,
+                        avg_loss=avg_loss,
+                    )
+                    break
+
                 for snake in self.env.snakes:
                     if snake.brain:
-                        snake.brain.save(
-                            config.paths.models / "snake_brain.pth"
-                        )
+                        epsilon = min(epsilon, snake.brain.epsilon)
+
+                if self.plotter:
+                    self.plotter.update(
+                        epoch, rewards, epoch_score, best_score, epsilon
+                    )
+
+                if epoch % config.nn.update_frequency == 0:
+                    for snake in self.env.snakes:
+                        if snake.brain:
+                            snake.brain.save(
+                                config.paths.models / "snake_brain.pth"
+                            )
 
         if self.plotter:
             self.plotter.close()
