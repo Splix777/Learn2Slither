@@ -34,9 +34,9 @@ class ReinforcementLearner:
         self.plotter: Plotter | None = plotter
 
     # Training
-    def train_epoch(self) -> Tuple[int, float, float, float, float]:
+    def train_epoch(self, fast: bool) -> Tuple:
         """Runs a single training epoch."""
-        best_score: int = 0
+        tscore: int = 0
         best_time: float = 0
         total_rewards: float = 0
         total_loss: float = 0
@@ -46,9 +46,7 @@ class ReinforcementLearner:
 
         while True:
             self.env.train_step()
-            best_score = max(
-                best_score, max(snake.size for snake in self.env.snakes)
-            )
+            tscore = max(tscore, max(snake.size for snake in self.env.snakes))
             total_rewards += max(snake.reward for snake in self.env.snakes)
 
             for snake in self.env.snakes:
@@ -62,7 +60,6 @@ class ReinforcementLearner:
                 for snake in self.env.snakes:
                     if snake.brain:
                         total_loss += snake.brain.loss_value
-                        # snake.brain.replay()
                         snake.brain.decay_epsilon()
                         epsilon = snake.brain.epsilon
 
@@ -71,11 +68,12 @@ class ReinforcementLearner:
                 best_time = max(best_time, elapsed_time)
                 break
 
-            # time.sleep(0.1)
+            if not fast:
+                time.sleep(0.1)
 
-        return best_score, best_time, total_rewards, avg_loss, epsilon
+        return tscore, best_time, total_rewards, avg_loss, epsilon
 
-    def train(self) -> None:
+    def train(self, fast: bool = True) -> None:
         """Trains the agent over multiple epochs."""
         early_stop = EarlyStop(
             patience=config.nn.patience, min_delta=config.nn.min_delta
@@ -85,9 +83,9 @@ class ReinforcementLearner:
         with self._set_train_pb() as progress:
             task: TaskID = self._train_task(progress)
             for epoch in range(self.config.nn.epochs):
-                e_score, e_time, reward, loss, epsilon = self.train_epoch()
-                best_score = max(best_score, e_score)
-                best_time = max(best_time, e_time)
+                score, etime, reward, loss, epsilon = self.train_epoch(fast)
+                best_score = max(best_score, score)
+                best_time = max(best_time, etime)
                 progress.update(
                     task,
                     advance=1,
@@ -124,7 +122,7 @@ class ReinforcementLearner:
 
                 if self.plotter:
                     self.plotter.update(
-                        epoch, reward, e_score, best_score, epsilon
+                        epoch, reward, score, best_score, epsilon
                     )
 
                 if epoch in [10, 50, 100]:
@@ -153,10 +151,10 @@ class ReinforcementLearner:
                 while True:
                     self.env.step()
                     max_score = max(
-                        max_score, max(snake.size for snake in self.env.snakes)
+                        max_score,
+                        max(snake.size for snake in self.env.snakes),
                     )
 
-                 
                     if self.gui:
                         self.gui.render_map(self.env)
 
@@ -172,10 +170,9 @@ class ReinforcementLearner:
                             avg_score=current_avg,
                         )
                         break
-                
+
                 if not fast:
                     time.sleep(0.1)
-
 
     def _set_eval_pb(self) -> Progress:
         """Sets the progress bar for evaluation."""
@@ -227,7 +224,7 @@ if __name__ == "__main__":
     gui = None
     # gui = PygameGUI(config)
     plotter = None
-    # plotter = Plotter()
+    plotter = Plotter()
 
     brain = Agent(config=config)
     snake1 = Snake(1, brain=brain, config=config)
@@ -241,7 +238,7 @@ if __name__ == "__main__":
     )
 
     try:
-        # interpreter.train()
+        interpreter.train()
         best_model = config.snake.difficulty.ai_hard
         best_model = config.paths.models / "snake_brain.pth"
         if snake1.brain:

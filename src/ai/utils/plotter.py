@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from typing import List
 
+from src.config.settings import config
+
 class Plotter:
     def __init__(self) -> None:
         """
@@ -98,5 +100,6 @@ class Plotter:
         """
         Closes the interactive plot window.
         """
-        plt.ioff()  # Turn off interactive mode
-        plt.show()  # Ensure the window doesn't close immediately when training ends
+        plt.ioff()
+        plt.savefig(config.paths.outputs / "training_progress.png")
+        plt.show()

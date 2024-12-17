@@ -115,7 +115,7 @@ class PygameGUI(GUI):
         pygame.mixer.music.set_volume(volume)
 
     def render_map(self, env: Environment) -> None:
-        """Render the game environment with the map centered and game info on the left side."""
+        """Render the game environment with the map centered."""
         if not self.screen:
             return
     

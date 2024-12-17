@@ -13,8 +13,8 @@ logging:
 
 map:
   board_size:
-    width: 30
-    height: 30
+    width: 10
+    height: 10
   green_apples: 2
   red_apples: 1
 
