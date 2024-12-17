@@ -222,7 +222,7 @@ class ReinforcementLearner:
 
 if __name__ == "__main__":
     gui = None
-    # gui = PygameGUI(config)
+    gui = PygameGUI(config)
     plotter = None
     plotter = Plotter()
 
@@ -238,12 +238,12 @@ if __name__ == "__main__":
     )
 
     try:
-        interpreter.train()
+        # interpreter.train()
         best_model = config.snake.difficulty.ai_hard
-        best_model = config.paths.models / "snake_brain.pth"
+        # best_model = config.paths.models / "snake_brain.pth"
         if snake1.brain:
             snake1.brain.load(best_model)
-        interpreter.evaluate(100)
+        interpreter.evaluate(100, fast=False)
     except KeyboardInterrupt:
         pass
     except Exception as e:
