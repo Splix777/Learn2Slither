@@ -11,8 +11,3 @@ class GUI(ABC):
     def run(self) -> None:
         """Run the GUI."""
         pass
-
-    @abstractmethod
-    def training_render(self, game_state: List[List[str]]) -> None:
-        """Render the game environment during training."""
-        pass

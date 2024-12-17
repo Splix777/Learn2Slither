@@ -13,14 +13,18 @@ logging:
 
 map:
   board_size:
-    width: 10
-    height: 10
+    width: 30
+    height: 30
   green_apples: 2
   red_apples: 1
 
 snake:
-  start_color: blue
   start_size: 3
+  difficulty:
+    ai_easy: snake_brain_10.pth
+    ai_medium: snake_brain_50.pth
+    ai_hard: snake_brain_100.pth
+
 
 visual:
   modes:
@@ -66,29 +70,33 @@ pygame_textures:
     light: backgrounds/splash_background_light.png
   texture_size: 32
 
+pygame_audio:
+  home: home.mp3
+  game: game.mp3
+
 rules:
   events:
     death: -10
-    green_apple: 10
+    green_apple: 1
     red_apple: -1
-    looping: -10
-    kill: 2
-  steps_no_apple: 20
+    looping: -1
+    kill: 1
+  steps_no_apple: 50
   win_condition:
     condition: max_snake_size
     max_score: 10
 
 nn:
-  batch_size: 128
+  batch_size: 64
   epochs: 1_000
   learning_rate: 0.001
   exploration:
     epsilon: 0.99
-    decay: 0.95
-    epsilon_min: 0.05
+    decay: 0.99
+    epsilon_min: 0.00
   gamma: 0.95
-  update_frequency: 5
-  input_shape: 52
+  update_frequency: 10
+  input_shape: 28
   output_shape: 4
   memory_size: 200_000
   patience: 100
@@ -99,3 +107,4 @@ paths:
   logs: logs
   outputs: outputs
   textures: resources/textures
+  audio: resources/audio

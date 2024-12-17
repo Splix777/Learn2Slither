@@ -45,7 +45,7 @@ class Environment:
     def _starting_positions(self) -> Dict[int, Tuple[Direction, int, int]]:
         """Get the starting positions for all snakes."""
         starting_positions: Dict[int, Tuple[Direction, int, int]] = {}
-        attempts = 10
+        attempts = 100
         starting_map = self._create_blank_map()
         for i in range(self.num_snakes):
             while attempts:
@@ -154,7 +154,7 @@ class Environment:
         self._check_collision(snake)
         self._check_apple_eaten(snake)
         self._check_looping(snake)
-    
+
     def _check_collision(self, snake: Snake) -> None:
         """Check if the snake collided with a wall or another snake."""
         if self._collided_wall(snake) or self._collided_snake(snake):
@@ -171,7 +171,7 @@ class Environment:
 
     def _check_looping(self, snake: Snake) -> None:
         """Check if the snake is looping."""
-        if snake.steps_without_food >= self.config.rules.steps_no_apple:
+        if snake.starving():
             snake.looping()
 
     def _collided_wall(self, snake: Snake) -> bool:
@@ -236,9 +236,10 @@ class Environment:
                 torch.tensor(snake.one_hot_direction),
                 torch.tensor(snake.one_hot_options),
                 self._assess_nearby_risks(head_x, head_y),
-                self._detect_surroundings(head_x, head_y, 40),
-                self._segmented_vision(head_x, head_y, 40),
-                self._evaluate_space_and_density(head_x, head_y),
+                self._apple_in_sight(head_x, head_y),
+                self._detect_surroundings(head_x, head_y, self.width),
+                # self._segmented_vision(head_x, head_y, self.width),
+                # self._evaluate_space_and_density(head_x, head_y),
             ]
         )
 
@@ -259,6 +260,26 @@ class Environment:
                 danger[index] = 1.0
 
         return danger
+
+    def _apple_in_sight(self, x: int, y: int) -> torch.Tensor:
+        """Detect if an apple is in sight in the four cardinal directions."""
+        result = torch.zeros(4, dtype=torch.float)
+
+        for index, direction in enumerate(Direction):
+            dr, dc = direction.value
+            for step in range(1, max(self.width, self.height)):
+                nx, ny = x + dr * step, y + dc * step
+                if nx < 0 or ny < 0 or nx >= self.height or ny >= self.width:
+                    break
+                cell = self.map[nx][ny]
+                if cell == "green_apple":
+                    result[index] = 1.0
+                    break
+                elif cell == "red_apple":
+                    result[index] = -1.0
+                    break
+
+        return result
 
     def _detect_surroundings(self, x: int, y: int, view: int) -> torch.Tensor:
         """Detect surrounding within a view range."""

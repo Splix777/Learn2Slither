@@ -4,25 +4,24 @@ import pygame
 from pygame.event import Event
 from pygame.rect import Rect
 
-from src.ui.pygame.screens.screen import BaseScreen
+from src.ui.pygame.screens.base_screen import BaseScreen
 from src.config.settings import Config
 
 
 class HomeScreen(BaseScreen):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, theme: str) -> None:
         self.config: Config = config
-        self.font = pygame.font.Font(None, 50)  # Larger font for buttons
-        self.options = ["Human vs AI", "AI Solo"]
+        self.theme: str = theme
+        self.font = pygame.font.Font(None, 50)
+        self.options = ["Human vs AI", "AI Solo", "Options"]
         self.selected_index = 0
         self.option_rects = []
 
-        # Store rendered text surfaces and their shadows
         self.text_surfaces = []
         self.shadow_surfaces = []
 
-        # Requested screen size
-        self.requested_screen_size = None
-        self.request_screen_resize((640, 480))
+        self.required_size = (800, 600)
+        self.current_resolution = self.required_size
 
         for option in self.options:
             text_surface = self.font.render(option, True, (255, 255, 255))
@@ -30,7 +29,9 @@ class HomeScreen(BaseScreen):
             self.text_surfaces.append(text_surface)
             self.shadow_surfaces.append(shadow_surface)
 
-    def handle_input(self, events: List[Event]) -> str:
+        self.next_screen = None
+
+    def handle_input(self, events: List[Event]):
         """Handle input to navigate to the home screen."""
         for event in events:
             if event.type == pygame.KEYDOWN:
@@ -43,7 +44,7 @@ class HomeScreen(BaseScreen):
                         self.options
                     )
                 elif event.key == pygame.K_RETURN:
-                    return (
+                    self.next_screen = (
                         self.options[self.selected_index]
                         .lower()
                         .replace(" ", "_")
@@ -54,14 +55,12 @@ class HomeScreen(BaseScreen):
                     if rect.collidepoint(event.pos):
                         self.selected_index = i
 
-            if (
-                event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-            ):  # Left click
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 for i, rect in enumerate(self.option_rects):
                     if rect.collidepoint(event.pos):
-                        return self.options[i].lower().replace(" ", "_")
-
-        return ""
+                        self.next_screen = (
+                            self.options[i].lower().replace(" ", "_")
+                        )
 
     def update(self) -> None:
         """Update the home screen."""
@@ -69,8 +68,8 @@ class HomeScreen(BaseScreen):
 
     def render(self, screen) -> None:
         """Render the home screen."""
-        if screen.get_size() != (640, 480):
-            self.request_screen_resize((640, 480))
+        if screen.get_size() != self.current_resolution:
+            self.current_resolution = screen.get_size()
 
         screen.fill((30, 30, 30))
 
@@ -110,12 +109,5 @@ class HomeScreen(BaseScreen):
 
             self.option_rects.append(Rect(x, y, text_width, text_height))
 
-    def request_screen_resize(self, new_size: tuple[int, int]) -> None:
-        """Request a screen size update."""
-        self.requested_screen_size = new_size
-
-    def get_requested_screen_size(self) -> Optional[tuple[int, int]]:
-        """Return the requested screen size and reset the request."""
-        size = self.requested_screen_size
-        self.requested_screen_size = None
-        return size
+    def get_next_screen(self) -> Optional[str]:
+        return self.next_screen

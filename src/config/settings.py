@@ -49,14 +49,21 @@ class MapConfig(BaseModel):
     )
 
 
+class SnakeModelPaths(BaseModel):
+    """Snake model paths configuration model."""
+    ai_easy: Path
+    ai_medium: Path
+    ai_hard: Path
+
+
 class SnakeConfig(BaseModel):
     """Snake configuration model."""
-    start_color: str
     start_size: int = Field(
         gt=0,
         lt=10,
         description="Starting size must be greater than 0 and less than 10",
     )
+    difficulty: SnakeModelPaths
 
 
 class VisualModes(BaseModel):
@@ -103,6 +110,11 @@ class PyGameTextures(BaseModel):
     empty: ThemedTextures
     backgrounds: ThemedTextures
     texture_size: int
+
+
+class PyGameAudio(BaseModel):
+    home: Path
+    game: Path
 
 
 class Events(BaseModel):
@@ -156,6 +168,7 @@ class PathsConfig(BaseModel):
     logs: Path
     outputs: Path
     textures: Path
+    audio: Path
 
 
 class Config(BaseModel):
@@ -167,6 +180,7 @@ class Config(BaseModel):
     visual: VisualConfig
     ascii: ASCIIConfig
     pygame_textures: PyGameTextures
+    pygame_audio: PyGameAudio
     rules: RulesConfig
     nn: NeuralNetworkConfig
     paths: PathsConfig
@@ -212,11 +226,21 @@ class Config(BaseModel):
         self.paths.logs = root_path / self.paths.logs
         self.paths.outputs = root_path / self.paths.outputs
         self.paths.textures = root_path / self.paths.textures
+        self.paths.audio = root_path / self.paths.audio
 
         for texture in vars(self.pygame_textures).values():
             if isinstance(texture, ThemedTextures):
                 texture.dark = self.paths.textures / texture.dark
                 texture.light = self.paths.textures / texture.light
+
+        for key, value in vars(self.pygame_audio).items():
+            setattr(self.pygame_audio, key, self.paths.audio / value)
+
+        for models in vars(self.snake).values():
+            if isinstance(models, SnakeModelPaths):
+                models.ai_easy = self.paths.models / models.ai_easy
+                models.ai_medium = self.paths.models / models.ai_medium
+                models.ai_hard = self.paths.models / models.ai_hard
 
         return self
 
@@ -230,6 +254,7 @@ class Config(BaseModel):
             ('green_apple', ['dark', 'light']),
             ('red_apple', ['dark', 'light']),
             ('empty', ['dark', 'light']),
+            ('backgrounds', ['dark', 'light']),
         ]
 
         for texture_name, sub_textures in textures_to_check:
@@ -238,6 +263,37 @@ class Config(BaseModel):
                 path = getattr(texture, sub_texture)
                 if not path.exists():
                     raise FileNotFoundError(f"Texture file not found: {path}")
+
+        return self
+    
+    @model_validator(mode="after")
+    def verify_audio_exists(self: "Config") -> "Config":
+        """Verify that all audio files exist."""
+        audio_to_check: List[str] = [
+            'home',
+            'game',
+        ]
+
+        for audio_name in audio_to_check:
+            path = getattr(self.pygame_audio, audio_name)
+            if not path.exists():
+                raise FileNotFoundError(f"Audio file not found: {path}")
+            
+        return self
+
+    @model_validator(mode="after")
+    def verify_ai_models_exist(self: "Config") -> "Config":
+        """Verify that all AI models exist."""
+        models_to_check: List[str] = [
+            'ai_easy',
+            'ai_medium',
+            'ai_hard',
+        ]
+
+        for model_name in models_to_check:
+            path = getattr(self.snake.difficulty, model_name)
+            if not path.exists():
+                raise FileNotFoundError(f"AI model not found: {path}")
 
         return self
 
@@ -258,7 +314,7 @@ def get_config() -> Config:
         raise
     except Exception as e:
         print(f"Unexpected error: {e}")
-        raise ValidationError(f"Error loading configuration: {e}") from e
+        raise ValidationError(f"Error loading configuration: {str(e)}") from e
 
 
 # Singleton pattern

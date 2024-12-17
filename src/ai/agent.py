@@ -13,7 +13,7 @@ from collections import deque
 from src.config.settings import Config
 
 
-class Brain(nn.Module):
+class Agent(nn.Module):
     def __init__(self, config: Config, path: Optional[str | Path] = None):
         super().__init__()
         self.gamma = config.nn.gamma
@@ -106,12 +106,12 @@ class Brain(nn.Module):
         """Cache experiences for replay."""
         self.memory.append(experiences)
 
-    def act(self, state: torch.Tensor) -> int:
+    def act(self, state: torch.Tensor, learn: bool) -> int:
         """Choose an action based on epsilon-greedy policy."""
-        if random.random() >= self.epsilon:
-            return self.choose_action(state)
-        else:
+        # self.epsilon = self.epsilon if learn else 0.005
+        if random.random() <= self.epsilon and learn:
             return random.randrange(self.output_size)
+        return self.choose_action(state)
 
     def choose_action(self, state: torch.Tensor) -> int:
         """Choose the best action based on Q-values."""

@@ -1,10 +1,11 @@
+import random
 from typing import Tuple, List, Optional
 from contextlib import suppress
 
 import torch
 
 from src.game.models.directions import Direction
-from src.ai.agent import Brain
+from src.ai.agent import Agent
 from src.config.settings import Config
 
 
@@ -13,12 +14,12 @@ class Snake:
         self,
         id: int,
         config: Config,
-        brain: Optional[Brain] = None,
+        brain: Optional[Agent] = None,
     ) -> None:
         self.id: int = id
         self.config: Config = config
         self.size: int = config.snake.start_size
-        self.brain: Optional[Brain] = brain
+        self.brain: Optional[Agent] = brain
         self.alive: bool = True
         self.kills: int = 0
         self.reward: int = 0
@@ -89,11 +90,9 @@ class Snake:
 
         self.steps_without_food += 1
         if self.brain and state is not None:
-            self.snake_controller(
-                self.brain.act(state)
-                if learn
-                else self.brain.choose_action(state)
-            )
+            self.snake_controller(self.brain.act(state, learn))
+            if self.starving():
+                self.snake_controller(random.choice([0, 1, 2, 3]))
 
         new_head: Tuple[int, int] = (
             self.head[0] + self.movement_direction.value[0],
@@ -141,6 +140,13 @@ class Snake:
         self.size = 0
         self.alive = False
         self.reward = self.config.rules.events.death
+
+    def starving(self) -> bool:
+        """Apply the starving penalty to the snake."""
+        if self.steps_without_food > self.config.rules.steps_no_apple:
+            self.steps_without_food = 0
+            return True
+        return False
 
     def reset_rewards(self) -> None:
         """Reset the snake's reward."""

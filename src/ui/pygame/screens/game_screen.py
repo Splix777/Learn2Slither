@@ -4,20 +4,21 @@ from pygame.event import Event
 
 import torch
 
-from src.ui.pygame.screens.screen import BaseScreen
+from src.ui.pygame.screens.base_screen import BaseScreen
 from src.config.settings import Config
 from src.game.environment import Environment
 from src.game.snake import Snake
-from src.ui.utils.texture_loader import TextureLoader
-from src.ai.agent import Brain
+from src.ui.utils.game_resource_loader import TextureLoader
+from src.ai.agent import Agent
 
 
 class GameScreen(BaseScreen):
-    def __init__(self, config: Config, mode: Optional[str] = None) -> None:
+    def __init__(self, config: Config, theme: str, mode: Optional[str] = None) -> None:
         self.config = config
+        self.theme = theme
         self.textures = TextureLoader(config)
         self.mode = mode
-        self.requested_screen_size = None
+        self.current_resolution = (1260, 960)
         # Game state
         self.env: Optional[Environment] = None
         self.game_controller: Callable = lambda: None
@@ -30,11 +31,11 @@ class GameScreen(BaseScreen):
         self.game_over_text = self.large_font.render(
             "Game Over", True, (255, 0, 0)
         )
-        # Initialize game state
+        self.next_screen: Optional[str] = None
         self.preload_textures()
         self.initialize_game()
 
-    def handle_input(self, events: List[Event]) -> str:
+    def handle_input(self, events: List[Event]):
         """Handle player input specific to the game."""
         key_mapping = {
             pygame.K_ESCAPE: lambda: "home",
@@ -47,11 +48,9 @@ class GameScreen(BaseScreen):
         for event in events:
             if event.type == pygame.KEYDOWN and event.key in key_mapping:
                 action = key_mapping[event.key]
-                if result := action():
-                    print(result)
-                    return result
+                if result := action() == "home":
+                    self.next_screen = str(result)
 
-        return ""
 
     def update(self) -> None:
         """Update game logic."""
@@ -62,8 +61,8 @@ class GameScreen(BaseScreen):
         elif self.mode == "ai_solo":
             self._handle_ai_movement(0)
 
-        if self.env and self.env.game_state:
-            self.game_state = self.env.game_state
+        if self.env and self.env.map:
+            self.game_state = self.env.map
 
     def _handle_ai_movement(self, snake_index: int) -> None:
         """Handle AI movement based on the current state."""
@@ -76,44 +75,54 @@ class GameScreen(BaseScreen):
 
     def render(self, screen: pygame.Surface) -> None:
         """Render the current game state (environment)."""
-        if not self.game_state:
+        if not screen or not self.env:
             return
-        screen.fill((255, 255, 255))
+    
+        screen.fill(color=(18, 90, 60))
 
-        for row_num, row in enumerate(self.game_state):
+        # Get map size
+        map_height = len(self.env.map)
+        map_width = len(self.env.map[0]) if map_height > 0 else 0
+
+        x_offset = (
+            self.current_resolution[0]
+            - map_width * self.textures.texture_size
+        ) // 2
+        y_offset = (
+            self.current_resolution[1]
+            - map_height * self.textures.texture_size
+        ) // 2
+
+        # Render map
+        for row_num, row in enumerate(self.env.map):
             for col_num, cell in enumerate(row):
-                texture: pygame.Surface = self.texture_cache[cell]
+                texture: pygame.Surface = pygame.image.load(
+                    str(self.texture_cache[cell])
+                )
                 screen.blit(
                     texture,
                     (
-                        col_num * self.textures.texture_size,
-                        row_num * self.textures.texture_size,
-                    ),
-                )
-        if self.env:
-            if not self.env.snakes[0].alive:
-                screen.blit(
-                    self.game_over_text,
-                    (
-                        screen.get_width() // 2
-                        - self.game_over_text.get_width() // 2,
-                        screen.get_height() // 2
-                        - self.game_over_text.get_height() // 2,
+                        x_offset + col_num * self.textures.texture_size,
+                        y_offset + row_num * self.textures.texture_size,
                     ),
                 )
 
-    def request_screen_resize(self, new_size: tuple[int, int]) -> None:
-        """Request a screen resize to the specified dimensions."""
-        if new_size[0] > 0 and new_size[1] > 0:
-            self.requested_screen_size = new_size
-        else:
-            raise ValueError("Screen size must be positive dimensions.")
+        # Render game info on the left side
+        font = pygame.font.Font(None, 20)
+        for i, snake in enumerate(self.env.snakes):
+            # Calculate position for each snake's apple count on the left side
+            text_surface = font.render(
+                f"Snake {i+1} Apples: {snake.green_apples_eaten}",
+                True,
+                (255, 255, 255),
+            )
+            screen.blit(text_surface, (10, 10 + i * 30))
 
-    def get_requested_screen_size(self) -> Optional[tuple[int, int]]:
-        """Return the requested screen size and reset the request."""
-        size = self.requested_screen_size
-        self.requested_screen_size = None
-        return size
+        pygame.display.update()
+
+    def get_next_screen(self) -> Optional[str]:
+        """Return the next screen if a transition is needed."""
+        return self.next_screen
 
     def initialize_game(self) -> None:
         """Initialize the game based on the selected mode."""
@@ -123,7 +132,7 @@ class GameScreen(BaseScreen):
             self.start_ai_solo_game()
 
     def preload_textures(self) -> None:
-        """Preload textures into memory for faster access during rendering."""
+        """Preload textures into memory for access during rendering."""
         self.texture_cache = {
             cell_type: pygame.image.load(
                 str(self.textures.textures[cell_type])
@@ -132,43 +141,32 @@ class GameScreen(BaseScreen):
         }
 
     def start_human_vs_ai_game(self) -> None:
-        self._reconfigure(2, (20, 20))
+        self._reconfigure(2)
         if self.env:
             self.game_controller = self.env.snakes[0].snake_controller
             self.ai_controller = self.env.snakes[1].snake_controller
 
     def start_ai_solo_game(self) -> None:
-        self._reconfigure(1, (10, 10))
+        self._reconfigure(1)
         if self.env:
             self.game_controller = self.env.snakes[0].snake_controller
 
-    def _reconfigure(self, snakes: int, dimensions: tuple[int, int]) -> None:
-        self.config.map.snakes = snakes
-        self.config.map.board_size.width = dimensions[0]
-        self.config.map.board_size.height = dimensions[1]
-        width = self.config.map.board_size.width * self.textures.texture_size
-        height = (
-            self.config.map.board_size.height * self.textures.texture_size
-        )
-        self.request_screen_resize((width, height))
+    def _reconfigure(self, snakes: int) -> None:
         self.pause = False
         self.exit = False
-        snake_list = [Snake(i) for i in range(snakes)]
-        self.env = Environment(self.config, snake_list)
-        self.agent = Brain(
-            input_size=self.env.snake_state_size,
-            output_size=4,
-            config=self.config,
-        )
-        ai_model_path = self.config.paths.models / "snake_best.pth"
-        self.agent.load(ai_model_path)
 
-    @torch.no_grad()
-    def get_ai_movement(self, state: List[float]) -> List[int]:
-        """Get the AI's movement based on the current state."""
-        movement = [0] * 4
-        state_tensor = torch.tensor(state, dtype=torch.float).unsqueeze(0)
-        q_values = self.agent(state_tensor)
-        move = int(torch.argmax(q_values).item())
-        movement[move] = 1
-        return movement
+
+        snake_list = [Snake(i, self.config) for i in range(snakes)]
+        self.env = Environment(self.config, snake_list)
+        self.agent = Agent(config=self.config)
+
+
+    # @torch.no_grad()
+    # def get_ai_movement(self, state: List[float]) -> List[int]:
+    #     """Get the AI's movement based on the current state."""
+    #     movement = [0] * 4
+    #     state_tensor = torch.tensor(state, dtype=torch.float).unsqueeze(0)
+    #     q_values = self.agent(state_tensor)
+    #     move = int(torch.argmax(q_values).item())
+    #     movement[move] = 1
+    #     return movement
