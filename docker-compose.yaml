@@ -1,0 +1,17 @@
+services:
+  learn2slither:
+    image: learn2slither
+    container_name: learn2slither
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    networks:
+      - default
+    restart: on-failure
+    stdin_open: true
+    tty: true
+
+networks:
+  default:
