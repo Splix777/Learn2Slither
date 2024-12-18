@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import pygame
 from pygame.event import Event
@@ -15,7 +15,7 @@ from src.game.environment import Environment
 
 
 class PygameGUI(GUI):
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, size: Optional[tuple[int, int]] = None) -> None:
         self.config = config
         # self.theme = config.visual.themes.selected_theme
         self.textures = TextureLoader(config)
@@ -25,7 +25,7 @@ class PygameGUI(GUI):
         self.music_on = True
         self.load_background_music("home")
 
-        self.current_resolution = (1360, 960)
+        self.current_resolution = size or (1360, 960)
         self.screen = pygame.display.set_mode(self.current_resolution)
         self.clock = pygame.time.Clock()
 

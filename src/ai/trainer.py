@@ -220,9 +220,15 @@ class ReinforcementLearner:
         )
 
 
+# Just for Testing
 if __name__ == "__main__":
     gui = None
-    gui = PygameGUI(config)
+    gui = PygameGUI(
+        config, 
+        (
+            config.map.board_size.width * config.pygame_textures.texture_size,
+            config.map.board_size.height * config.pygame_textures.texture_size,
+        ))
     plotter = None
     plotter = Plotter()
 
@@ -243,7 +249,7 @@ if __name__ == "__main__":
         # best_model = config.paths.models / "snake_brain.pth"
         if snake1.brain:
             snake1.brain.load(best_model)
-        interpreter.evaluate(100, fast=False)
+        interpreter.evaluate(100, fast=True)
     except KeyboardInterrupt:
         pass
     except Exception as e:
