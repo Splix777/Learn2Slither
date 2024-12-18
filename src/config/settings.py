@@ -51,9 +51,10 @@ class MapConfig(BaseModel):
 
 class SnakeModelPaths(BaseModel):
     """Snake model paths configuration model."""
-    ai_easy: Path
-    ai_medium: Path
-    ai_hard: Path
+    easy: Path
+    medium: Path
+    hard: Path
+    expert: Path
 
 
 class SnakeConfig(BaseModel):
@@ -64,6 +65,7 @@ class SnakeConfig(BaseModel):
         description="Starting size must be greater than 0 and less than 10",
     )
     difficulty: SnakeModelPaths
+    selected_difficulty: Path
 
 
 class VisualModes(BaseModel):
@@ -74,7 +76,7 @@ class VisualModes(BaseModel):
 
 class ThemesConfig(BaseModel):
     """Themes configuration model."""
-    default_theme: Literal["dark", "light"]
+    selected_theme: Literal["dark", "light"]
     available_themes: List[Literal["light", "dark"]]
 
 
@@ -238,9 +240,10 @@ class Config(BaseModel):
 
         for models in vars(self.snake).values():
             if isinstance(models, SnakeModelPaths):
-                models.ai_easy = self.paths.models / models.ai_easy
-                models.ai_medium = self.paths.models / models.ai_medium
-                models.ai_hard = self.paths.models / models.ai_hard
+                models.easy = self.paths.models / models.easy
+                models.medium = self.paths.models / models.medium
+                models.hard = self.paths.models / models.hard
+                models.expert = self.paths.models / models.expert
 
         return self
 
@@ -285,16 +288,18 @@ class Config(BaseModel):
     def verify_ai_models_exist(self: "Config") -> "Config":
         """Verify that all AI models exist."""
         models_to_check: List[str] = [
-            'ai_easy',
-            'ai_medium',
-            'ai_hard',
+            'easy',
+            'medium',
+            'hard',
+            'expert',
         ]
 
         for model_name in models_to_check:
             path = getattr(self.snake.difficulty, model_name)
             if not path.exists():
                 raise FileNotFoundError(f"AI model not found: {path}")
-
+            
+        self.snake.selected_difficulty = self.snake.difficulty.expert
         return self
 
 

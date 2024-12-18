@@ -17,7 +17,7 @@ class TextureLoader:
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.gui_mode: str = config.visual.modes.mode
-        self.theme: str = config.visual.themes.default_theme
+        self.theme: str = config.visual.themes.selected_theme
         self.textures = self.load_textures()
 
     def load_textures(self) -> dict[str, Text] | dict[str, Path]:

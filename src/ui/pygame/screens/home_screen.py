@@ -20,7 +20,7 @@ class HomeScreen(BaseScreen):
         self.text_surfaces = []
         self.shadow_surfaces = []
 
-        self.required_size = (800, 600)
+        self.required_size = (1360, 960)
         self.current_resolution = self.required_size
 
         for option in self.options:
@@ -75,6 +75,8 @@ class HomeScreen(BaseScreen):
 
         background: pygame.Surface = pygame.image.load(
             self.config.pygame_textures.backgrounds.dark
+            if self.theme == "dark"
+            else self.config.pygame_textures.backgrounds.light
         )
         screen.blit(
             pygame.transform.scale(background, screen.get_size()), (0, 0)
@@ -110,4 +112,6 @@ class HomeScreen(BaseScreen):
             self.option_rects.append(Rect(x, y, text_width, text_height))
 
     def get_next_screen(self) -> Optional[str]:
-        return self.next_screen
+        next_screen = self.next_screen
+        self.next_screen = None
+        return next_screen

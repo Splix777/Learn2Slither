@@ -2,12 +2,14 @@ from typing import List, Optional, Callable
 import pygame
 from pygame.event import Event
 
-from src.ui.pygame.screens.base_screen import BaseScreen
-from src.config.settings import Config
-from src.game.environment import Environment
-from src.game.snake import Snake
-from src.ui.utils.game_resource_loader import TextureLoader
 from src.ai.agent import Agent
+from src.config.settings import Config
+from src.game.snake import Snake
+from src.game.environment import Environment
+from src.ui.pygame.screens.base_screen import BaseScreen
+from src.ui.utils.game_resource_loader import TextureLoader
+from src.ui.pygame.widgets.board_widget import BoardWidget
+from src.ui.pygame.widgets.scores_widget import ScoreWidget
 
 
 class GameScreen(BaseScreen):
@@ -18,11 +20,10 @@ class GameScreen(BaseScreen):
         self.theme = theme
         self.textures = TextureLoader(config)
         self.mode = mode
-        self.current_resolution = (1260, 960)
+        self.current_resolution = (1360, 960)
         # Game state
         self.env: Optional[Environment] = None
         self.game_controller: Callable = lambda: None
-        self.ai_controller: Callable = lambda: None
         self.bindings: dict[str, int] = {"w": 0, "s": 1, "a": 2, "d": 3}
         self.pause = False
         self.exit = False
@@ -37,7 +38,7 @@ class GameScreen(BaseScreen):
     def handle_input(self, events: List[Event]):
         """Handle player input specific to the game."""
         key_mapping = {
-            pygame.K_ESCAPE: lambda: "home",
+            pygame.K_ESCAPE: lambda: self.return_home(),
             pygame.K_SPACE: lambda: setattr(self, "pause", not self.pause),
             pygame.K_w: lambda: self.game_controller(self.bindings["w"]),
             pygame.K_s: lambda: self.game_controller(self.bindings["s"]),
@@ -55,13 +56,7 @@ class GameScreen(BaseScreen):
         """Update game logic."""
         if self.pause or self.exit:
             return
-        self._handle_ai_movement()
 
-        if self.env and self.env.map:
-            self.game_state = self.env.map
-
-    def _handle_ai_movement(self) -> None:
-        """Handle AI movement based on the current state."""
         if self.env:
             self.env.step()
 
@@ -70,47 +65,33 @@ class GameScreen(BaseScreen):
         if not screen or not self.env:
             return
 
-        screen.fill(color=(18, 90, 60))
-
-        map_height = len(self.env.map)
-        map_width = len(self.env.map[0]) if map_height > 0 else 0
-
-        x_offset = (
-            self.current_resolution[0]
-            - map_width * self.textures.texture_size
-        ) // 2
-        y_offset = (
-            self.current_resolution[1]
-            - map_height * self.textures.texture_size
-        ) // 2
-
-        for row_num, row in enumerate(self.env.map):
-            for col_num, cell in enumerate(row):
-                texture: pygame.Surface = pygame.image.load(
-                    str(self.textures.textures[cell])
-                )
-                screen.blit(
-                    texture,
-                    (
-                        x_offset + col_num * self.textures.texture_size,
-                        y_offset + row_num * self.textures.texture_size,
-                    ),
-                )
-
-        font = pygame.font.Font(None, 20)
-        for i, snake in enumerate(self.env.snakes):
-            text_surface = font.render(
-                f"Snake {i+1} Apples: {snake.green_apples_eaten}",
-                True,
-                (255, 255, 255),
+        screen.fill(color=(0, 0, 0))
+        self.board_widget.render(screen, game_board=self.env.map)
+        if self.mode == "human_vs_ai":
+            self.human_score_widget.render(
+                screen, score=self.env.snakes[0].green_apples_eaten
             )
-            screen.blit(text_surface, (10, 10 + i * 30))
+            self.ai_score_widget.render(
+                screen, score=self.env.snakes[1].green_apples_eaten
+            )
+        elif self.mode == "ai_solo":
+            self.ai_score_widget.render(
+                screen, score=self.env.snakes[0].green_apples_eaten
+            )
 
         pygame.display.update()
 
     def get_next_screen(self) -> Optional[str]:
         """Return the next screen if a transition is needed."""
-        return self.next_screen
+        next_screen = self.next_screen
+        self.next_screen = None
+        return next_screen
+
+    def return_home(self) -> None:
+        """Return to the home screen."""
+        if self.env:
+            self.env = None
+        self.next_screen = "home"
 
     def initialize_game(self) -> None:
         """Initialize the game based on the selected mode."""
@@ -119,28 +100,40 @@ class GameScreen(BaseScreen):
         elif self.mode == "ai_solo":
             self.start_ai_solo_game()
 
-    def preload_textures(self) -> None:
-        """Preload textures into memory for access during rendering."""
-        self.texture_cache = {
-            cell_type: pygame.image.load(
-                str(self.textures.textures[cell_type])
-            )
-            for cell_type in self.textures.textures
-        }
-
     def start_human_vs_ai_game(self) -> None:
         self._reconfigure(2)
         if self.env:
-            self.game_controller = self.env.snakes[0].snake_controller
+            self.game_controller = self.env.snakes[0].snake_controller 
+        self.human_score_widget = ScoreWidget(
+            pos=(10, 10),
+            size=(200, 100),
+            z=1,
+            textures=self.textures,
+            snake_id=1,
+        )
+        self.ai_score_widget = ScoreWidget(
+            pos=(10, 120),
+            size=(200, 100),
+            z=1,
+            textures=self.textures,
+            snake_id=2,
+        )
 
     def start_ai_solo_game(self) -> None:
         self._reconfigure(1)
+        self.ai_score_widget = ScoreWidget(
+            pos=(10, 10),
+            size=(200, 100),
+            z=1,
+            textures=self.textures,
+            snake_id=1,
+        )
 
     def _reconfigure(self, snakes: int) -> None:
         self.pause = False
         self.exit = False
         brain = Agent(
-            config=self.config, path=self.config.snake.difficulty.ai_hard
+            config=self.config, path=self.config.snake.selected_difficulty
         )
         ai_snake = Snake(1, self.config, brain)
         if snakes == 2:
@@ -148,3 +141,16 @@ class GameScreen(BaseScreen):
             self.env = Environment(self.config, [human_snake, ai_snake])
         else:
             self.env = Environment(self.config, [ai_snake])
+
+        board_width = self.env.width * self.textures.texture_size
+        board_height = self.env.height * self.textures.texture_size
+
+        centered_x = (self.current_resolution[0] - board_width) // 2
+        centered_y = (self.current_resolution[1] - board_height) // 2
+
+        self.board_widget = BoardWidget(
+            pos=(centered_x, centered_y),
+            size=(self.textures.texture_size, self.textures.texture_size),
+            z=0,
+            textures=self.textures,
+        )

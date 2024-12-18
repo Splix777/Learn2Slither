@@ -8,6 +8,7 @@ from src.ui.base_gui import GUI
 from src.config.settings import Config
 from src.ui.pygame.screens.game_screen import GameScreen
 from src.ui.pygame.screens.home_screen import HomeScreen
+from src.ui.pygame.screens.options_screen import OptionsScreen
 from src.ui.utils.game_resource_loader import TextureLoader
 from src.ui.pygame.screens.landing_screen import LandingScreen
 from src.game.environment import Environment
@@ -16,24 +17,38 @@ from src.game.environment import Environment
 class PygameGUI(GUI):
     def __init__(self, config: Config):
         self.config = config
+        # self.theme = config.visual.themes.selected_theme
         self.textures = TextureLoader(config)
-        self.theme = config.visual.themes.default_theme
 
         pygame.init()
         pygame.mixer.init()
+        self.music_on = True
         self.load_background_music("home")
 
-        self.current_resolution = (1260, 960)
+        self.current_resolution = (1360, 960)
         self.screen = pygame.display.set_mode(self.current_resolution)
         self.clock = pygame.time.Clock()
 
         self.screens = {
-            "landing": LandingScreen(config, self.theme),
-            "home": HomeScreen(config, self.theme),
-            "human_vs_ai": GameScreen(config, self.theme, "human_vs_ai"),
-            "ai_solo": GameScreen(config, self.theme, "ai_solo"),
+            "landing": lambda: LandingScreen(
+                config, self.config.visual.themes.selected_theme
+            ),
+            "home": lambda: HomeScreen(
+                config, self.config.visual.themes.selected_theme
+            ),
+            "human_vs_ai": lambda: GameScreen(
+                config,
+                self.config.visual.themes.selected_theme,
+                "human_vs_ai",
+            ),
+            "ai_solo": lambda: GameScreen(
+                config, self.config.visual.themes.selected_theme, "ai_solo"
+            ),
+            "options": lambda: OptionsScreen(
+                config, self.config.visual.themes.selected_theme, self
+            ),
         }
-        self.current_screen = self.screens["landing"]
+        self.current_screen = self.screens["landing"]()
 
         # Set window title and icon
         pygame.display.set_caption("Battle Snakes")
@@ -64,7 +79,7 @@ class PygameGUI(GUI):
     def transition_to_screen(self, screen_name) -> None:
         if screen_name not in self.screens:
             raise ValueError(f"Unknown screen: {screen_name}")
-        self.current_screen = self.screens[screen_name]
+        self.current_screen = self.screens[screen_name]()
         if isinstance(self.current_screen, LandingScreen | HomeScreen):
             self.load_background_music("home")
         elif isinstance(self.current_screen, GameScreen):
@@ -91,7 +106,10 @@ class PygameGUI(GUI):
             # Handle global keyboard events
             keys: ScancodeWrapper = pygame.key.get_pressed()
             if keys[pygame.K_ESCAPE]:
-                self.running = False
+                if isinstance(self.current_screen, GameScreen):
+                    self.current_screen.return_home()
+                else:
+                    self.running = False
 
     def resize_screen(self, new_size: tuple[int, int]) -> None:
         """Resize the screen."""
@@ -102,13 +120,22 @@ class PygameGUI(GUI):
 
     def load_background_music(self, track: str) -> None:
         """Load the background music."""
-        pygame.mixer.music.load(
-            str(self.config.pygame_audio.home)
-            if track == "home"
-            else str(self.config.pygame_audio.game)
-        )
-        pygame.mixer.music.play(-1)
-        self.set_music_volume(0.5)
+        if self.music_on:
+            pygame.mixer.music.load(
+                str(self.config.pygame_audio.home)
+                if track == "home"
+                else str(self.config.pygame_audio.game)
+            )
+            pygame.mixer.music.play(-1)
+            self.set_music_volume(0.5)
+
+    def toggle_music(self) -> None:
+        """Toggle the music on or off."""
+        self.music_on = not self.music_on
+        if self.music_on:
+            pygame.mixer.music.unpause()
+        else:
+            pygame.mixer.music.pause()
 
     def set_music_volume(self, volume: float) -> None:
         """Set the volume of the background music."""
@@ -116,25 +143,22 @@ class PygameGUI(GUI):
 
     def render_map(self, env: Environment) -> None:
         """Render the game environment with the map centered."""
+        events = pygame.event.get()
+        self.handle_global_events(events)
         if not self.screen:
             return
-    
-        self.screen.fill(color=(18, 90, 60))
 
-        # Get map size
-        map_height = len(env.map)
-        map_width = len(env.map[0]) if map_height > 0 else 0
+        self.screen.fill(
+            color=(18, 90, 60),
+        )
 
-        x_offset = (
-            self.current_resolution[0]
-            - map_width * self.textures.texture_size
-        ) // 2
-        y_offset = (
-            self.current_resolution[1]
-            - map_height * self.textures.texture_size
-        ) // 2
+        board_width = env.width * self.textures.texture_size
+        board_height = env.height * self.textures.texture_size
 
-        # Render map
+        centered_x = (self.current_resolution[0] - board_width) // 2
+        centered_y = (self.current_resolution[1] - board_height) // 2
+
+
         for row_num, row in enumerate(env.map):
             for col_num, cell in enumerate(row):
                 texture: pygame.Surface = pygame.image.load(
@@ -143,21 +167,10 @@ class PygameGUI(GUI):
                 self.screen.blit(
                     texture,
                     (
-                        x_offset + col_num * self.textures.texture_size,
-                        y_offset + row_num * self.textures.texture_size,
+                        centered_x + col_num * self.textures.texture_size,
+                        centered_y + row_num * self.textures.texture_size,
                     ),
                 )
-
-        # Render game info on the left side
-        font = pygame.font.Font(None, 20)
-        for i, snake in enumerate(env.snakes):
-            # Calculate position for each snake's apple count on the left side
-            text_surface = font.render(
-                f"Snake {i+1} Apples: {snake.green_apples_eaten}",
-                True,
-                (255, 255, 255),
-            )
-            self.screen.blit(text_surface, (10, 10 + i * 30))
 
         pygame.display.update()
 

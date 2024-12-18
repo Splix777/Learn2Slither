@@ -5,12 +5,12 @@ FROM python:3.12
 WORKDIR /app
 
 # Update apt and install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    linux-headers-amd64 \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     build-essential \
+#     linux-headers-amd64 \
+#     gcc \
+#     python3-dev \
+#     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip

@@ -39,14 +39,14 @@ class Environment:
             self.snakes[index].initialize((x, y), dir)
         self.green_apples = set()
         self.red_apples = set()
-        self._draw_map()
+        self._update_map()
 
     # Map Creation and Rendering
     def _starting_positions(self) -> Dict[int, Tuple[Direction, int, int]]:
         """Get the starting positions for all snakes."""
         starting_positions: Dict[int, Tuple[Direction, int, int]] = {}
-        attempts = 100
         starting_map = self._create_blank_map()
+        attempts = 100
         for i in range(self.num_snakes):
             while attempts:
                 x, y = self._find_empty_cell(starting_map)
@@ -63,12 +63,15 @@ class Environment:
 
     def _find_empty_cell(self, game_map: List[List[str]]) -> Tuple[int, int]:
         """Get a random empty position on the map."""
-        while True:
-            x: int = random.randint(1, self.width - 2)
-            y: int = random.randint(1, self.height - 2)
-            if game_map[y][x] == "empty":
-                break
-        return x, y
+        if not (empty_cells := [
+            (row, col)
+            for row in range(1, self.height - 1)
+            for col in range(1, self.width - 1)
+            if game_map[row][col] == "empty"
+        ]):
+            raise ValueError("No empty cells available.")
+        else:
+            return random.choice(empty_cells)
 
     def _has_space(
         self, pos: Tuple[int, int], map: List[List[str]], direction: Direction
@@ -97,12 +100,11 @@ class Environment:
 
         return True
 
-    def _draw_map(self) -> None:
+    def _update_map(self) -> None:
         """Create a map with the given configuration."""
         rendered_map: List[List[str]] = self._create_blank_map()
-        self._draw_snakes_on_map(rendered_map)
-        self._populate_apples(rendered_map)
-        self._draw_apples_on_map(rendered_map)
+        self._place_snakes_on_grid(rendered_map)
+        self._distribute_apples_on_grid(rendered_map)
         self.map = rendered_map
 
     def _create_blank_map(self) -> List[List[str]]:
@@ -120,7 +122,7 @@ class Environment:
 
         return game_map
 
-    def _draw_snakes_on_map(self, game_map: List[List[str]]) -> None:
+    def _place_snakes_on_grid(self, game_map: List[List[str]]) -> None:
         """Place the snakes on the map."""
         for snake in self.snakes:
             if snake.alive and snake.initialized:
@@ -128,26 +130,22 @@ class Environment:
                 for segment in snake.body[1:]:
                     game_map[segment[0]][segment[1]] = "snake_body"
 
-    def _draw_apples_on_map(self, game_map: List[List[str]]) -> None:
+    def _distribute_apples_on_grid(self, game_map: List[List[str]]) -> None:
         """Place apples on the map."""
-        for apple in self.green_apples:
-            if game_map[apple[0]][apple[1]] != "empty":
-                continue
-            game_map[apple[0]][apple[1]] = "green_apple"
-        for apple in self.red_apples:
-            if game_map[apple[0]][apple[1]] != "empty":
-                continue
-            game_map[apple[0]][apple[1]] = "red_apple"
-
-    def _populate_apples(self, game_map: List[List[str]]) -> None:
-        """Add apples to random empty spaces on the map."""
         while len(self.green_apples) < self.max_green_apples:
             x, y = self._find_empty_cell(game_map)
-            self.green_apples.add((y, x))
-
+            if game_map[y][x] == "empty":
+                self.green_apples.add((y, x))
+                game_map[y][x] = "green_apple"
+        for apple in self.green_apples:
+            game_map[apple[0]][apple[1]] = "green_apple"
         while len(self.red_apples) < self.max_red_apples:
             x, y = self._find_empty_cell(game_map)
-            self.red_apples.add((y, x))
+            if game_map[y][x] == "empty":
+                self.red_apples.add((y, x))
+                game_map[y][x] = "red_apple"
+        for apple in self.red_apples:
+            game_map[apple[0]][apple[1]] = "red_apple"
 
     # Events
     def _process_collision_events(self, snake) -> None:
@@ -163,9 +161,11 @@ class Environment:
     def _check_apple_eaten(self, snake: Snake) -> None:
         """Check if the snake ate an apple."""
         if self.map[snake.head[0]][snake.head[1]] == "green_apple":
+            self.map[snake.head[0]][snake.head[1]] = "snake_head"
             self.green_apples.remove(snake.head)
             snake.eat_green_apple()
         elif self.map[snake.head[0]][snake.head[1]] == "red_apple":
+            self.map[snake.head[0]][snake.head[1]] = "snake_head"
             self.red_apples.remove(snake.head)
             snake.eat_red_apple()
 
@@ -190,7 +190,7 @@ class Environment:
 
     # Game Steps
     def train_step(self) -> None:
-        """Perform one step in the game for all snakes, ensuring proper next-step views."""
+        """Perform one step in the game for all snakes."""
         buffer = {}
         for index, snake in enumerate(self.snakes):
             snake.reset_rewards()
@@ -202,6 +202,11 @@ class Environment:
 
         next_states = [self.get_state(snake) for snake in self.snakes]
 
+        self._save_to_cache(buffer, next_states)
+        self._update_map()
+
+    def _save_to_cache(self, buffer: Dict, next_states: List[torch.Tensor]):
+        """Save the current buffer & next state to the replay buffer."""
         for index, snake in enumerate(self.snakes):
             if snake.brain:
                 state, action, reward, done = buffer[index]
@@ -216,15 +221,13 @@ class Environment:
                     )
                 )
 
-        self._draw_map()
-
     def step(self) -> None:
         """Perform one step in the game based on the chosen action."""
         for snake in self.snakes:
             snake.move(self.get_state(snake))
             self._process_collision_events(snake)
 
-        self._draw_map()
+        self._update_map()
 
     # State Representation
     def get_state(self, snake: Snake) -> torch.Tensor:
@@ -238,8 +241,6 @@ class Environment:
                 self._assess_nearby_risks(head_x, head_y),
                 self._apple_in_sight(head_x, head_y),
                 self._detect_surroundings(head_x, head_y, self.width),
-                # self._segmented_vision(head_x, head_y, self.width),
-                # self._evaluate_space_and_density(head_x, head_y),
             ]
         )
 
@@ -325,58 +326,22 @@ class Environment:
 
         return result
 
-    def _segmented_vision(self, x: int, y: int, steps: int) -> torch.Tensor:
-        """Provide segmented vision looking steps ahead in each direction."""
-        # 4 directions * 4 features (wall, body, green apple, red apple)
-        vision = torch.zeros(16, dtype=torch.float)
-        directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
-
-        for index, (dx, dy) in enumerate(directions):
-            for step in range(1, steps + 1):
-                nx, ny = x + step * dx.item(), y + step * dy.item()
-                cell = self.map[nx][ny]
-                if nx < 0 or ny < 0 or nx >= self.height or ny >= self.width:
-                    vision[index * 4] = 1.0
-                    break
-                elif cell == "wall":
-                    vision[index * 4] = 1.0
-                elif cell == "snake_body" or "snake_head":
-                    vision[index * 4 + 1] = 1.0
-                elif cell == "green_apple":
-                    vision[index * 4 + 2] = 1.0
-                elif cell == "red_apple":
-                    vision[index * 4 + 3] = 1.0
-                if cell != "empty":
-                    break
-
-        return vision
-
-    def _evaluate_space_and_density(self, x: int, y: int) -> torch.Tensor:
-        """Combine green and red apple density and open space ratio for each direction."""
-        # 4 directions * (green apple, red apple, open space)
-        result = torch.zeros(12, dtype=torch.float)
-        directions = torch.tensor([[-1, 0], [1, 0], [0, -1], [0, 1]])
-
-        for index, (dx, dy) in enumerate(directions):
-            green_apples = red_apples = open_space = 0
-            for step in range(1, 6):
-                nx, ny = x + step * dx.item(), y + step * dy.item()
-                if nx < 0 or ny < 0 or nx >= self.height or ny >= self.width:
-                    break
-                cell = self.map[nx][ny]
-                if cell == "green_apple":
-                    green_apples += 1
-                elif cell == "red_apple":
-                    red_apples += 1
-                elif cell == "empty":
-                    open_space += 1
-
-            result[index * 3] = green_apples / 5.0
-            result[index * 3 + 1] = red_apples / 5.0
-            result[index * 3 + 2] = open_space / 5.0
-
-        return result
-
     def _normalize(self, value: int, max_value: int) -> float:
         """Normalize a value between 0 and 1."""
         return value / max_value if max_value != 0 else 0
+
+    def pretty_print_map(self) -> None:
+        """Print the map in a human-readable format."""
+        # only the first 2 letters of each cell
+        for row in self.map:
+            print("".join([cell[:2] for cell in row]))
+
+
+if __name__ == "__main__":
+    from src.config.settings import config
+
+    snakes = [Snake(0, config) for _ in range(1)]
+    env = Environment(config, snakes)
+    env.pretty_print_map()
+    env.step()
+    env.pretty_print_map()

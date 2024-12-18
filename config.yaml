@@ -21,9 +21,11 @@ map:
 snake:
   start_size: 3
   difficulty:
-    ai_easy: snake_brain_10.pth
-    ai_medium: snake_brain_50.pth
-    ai_hard: snake_brain_100.pth
+    easy: snake_brain_10.pth
+    medium: snake_brain_50.pth
+    hard: snake_brain_100.pth
+    expert: snake_brain.pth
+  selected_difficulty: easy
 
 
 visual:
@@ -33,7 +35,7 @@ visual:
       - cli
       - pygame
   themes:
-    default_theme: dark
+    selected_theme: dark
     available_themes:
       - light
       - dark

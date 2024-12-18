@@ -238,8 +238,8 @@ if __name__ == "__main__":
     )
 
     try:
-        # interpreter.train()
-        best_model = config.snake.difficulty.ai_hard
+        interpreter.train()
+        best_model = config.snake.difficulty.expert
         # best_model = config.paths.models / "snake_brain.pth"
         if snake1.brain:
             snake1.brain.load(best_model)
