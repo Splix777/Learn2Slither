@@ -1,3 +1,5 @@
+"""TextureLoader class module."""
+
 from pathlib import Path
 from rich.text import Text
 from rich.style import Style
@@ -21,6 +23,7 @@ class TextureLoader:
         self.textures = self.load_textures()
 
     def load_textures(self) -> dict[str, Text] | dict[str, Path]:
+        """Load textures based on the GUI mode."""
         return (
             self.load_ascii_textures()
             if self.gui_mode == "cli"
@@ -29,6 +32,7 @@ class TextureLoader:
 
     # <-- ASCII textures -->
     def load_ascii_textures(self) -> dict[str, Text]:
+        """Load ASCII textures."""
         styles: dict[str, Style] = (
             self.generate_ascii_style("white", "black")
             if self.theme == "dark"
@@ -42,6 +46,7 @@ class TextureLoader:
     def generate_ascii_style(
         self, fg_color: str, bg_color: str
     ) -> dict[str, Style]:
+        """Generate ASCII styles."""
         return {
             "wall": Style(color=fg_color, bgcolor=bg_color),
             "snake_head": Style(
@@ -62,13 +67,13 @@ class TextureLoader:
 
     # <-- Pygame textures -->
     def load_pygame_textures(self) -> dict[str, Path]:
+        """Load Pygame textures."""
         return {
-            key: getattr(
-                getattr(self.config.textures, key), self.theme
-            )
+            key: getattr(getattr(self.config.textures, key), self.theme)
             for key in self.KEYS
         }
 
     @property
     def texture_size(self) -> int:
+        """Return the texture size."""
         return self.config.textures.texture_size

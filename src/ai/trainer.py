@@ -1,3 +1,5 @@
+"""Agent Interface for the Snake Game."""
+
 import os
 import time
 from typing import Optional, Tuple

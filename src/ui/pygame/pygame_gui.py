@@ -1,3 +1,5 @@
+"""PyGame GUI implementation."""
+
 from typing import List, Optional
 
 import pygame
@@ -15,7 +17,9 @@ from src.game.environment import Environment
 
 
 class PygameGUI(GUI):
-    def __init__(self, config: Config, size: Optional[tuple[int, int]] = None) -> None:
+    def __init__(
+        self, config: Config, size: Optional[tuple[int, int]] = None
+    ) -> None:
         self.config: Config = config
         self.textures = TextureLoader(config)
 
@@ -139,11 +143,11 @@ class PygameGUI(GUI):
     def render_map(self, env: Environment) -> None:
         """Render the game environment with the map centered."""
         if not pygame.display.get_active():
-            return   
-     
+            return
+
         events = pygame.event.get()
         self.handle_global_events(events)
-        
+
         if not self.screen:
             return
 
@@ -156,7 +160,6 @@ class PygameGUI(GUI):
 
         centered_x = (self.current_resolution[0] - board_width) // 2
         centered_y = (self.current_resolution[1] - board_height) // 2
-
 
         for row_num, row in enumerate(env.map):
             for col_num, cell in enumerate(row):

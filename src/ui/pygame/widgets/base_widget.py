@@ -1,3 +1,5 @@
+"""Widget base class abstract."""
+
 import pygame
 from typing import Tuple
 

@@ -1,3 +1,5 @@
+"""Options Screen Module."""
+
 from typing import List, Optional
 from pathlib import Path
 

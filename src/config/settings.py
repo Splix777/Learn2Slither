@@ -9,6 +9,7 @@ from pydantic_yaml import parse_yaml_raw_as
 
 class ProjectConfig(BaseModel):
     """Project configuration model."""
+
     name: str
     description: str
     version: str
@@ -20,12 +21,14 @@ class ProjectConfig(BaseModel):
 
 class LoggingConfig(BaseModel):
     """Logging configuration model."""
+
     level: Literal["debug", "info", "warning", "error", "critical"]
     file: str
 
 
 class BoardSize(BaseModel):
     """Board size configuration model."""
+
     width: int = Field(
         ge=10,
         le=100,
@@ -40,6 +43,7 @@ class BoardSize(BaseModel):
 
 class MapConfig(BaseModel):
     """Map configuration model."""
+
     board_size: BoardSize
     green_apples: int = Field(
         gt=0, description="Starting green apples must be greater than 0"
@@ -51,6 +55,7 @@ class MapConfig(BaseModel):
 
 class SnakeModelPaths(BaseModel):
     """Snake model paths configuration model."""
+
     easy: Path
     medium: Path
     hard: Path
@@ -59,6 +64,7 @@ class SnakeModelPaths(BaseModel):
 
 class SnakeConfig(BaseModel):
     """Snake configuration model."""
+
     start_size: int = Field(
         gt=0,
         lt=10,
@@ -70,24 +76,28 @@ class SnakeConfig(BaseModel):
 
 class VisualModes(BaseModel):
     """Visual modes configuration model."""
+
     mode: Literal["cli", "pygame"]
     available_modes: List[Literal["cli", "pygame"]]
 
 
 class ThemesConfig(BaseModel):
     """Themes configuration model."""
+
     selected_theme: Literal["dark", "light"]
     available_themes: List[Literal["light", "dark"]]
 
 
 class VisualConfig(BaseModel):
     """Visual configuration model."""
+
     modes: VisualModes
     themes: ThemesConfig
 
 
 class ASCIIConfig(BaseModel):
     """ASCII configuration model."""
+
     wall: str
     snake_head: str
     snake_body: str
@@ -98,12 +108,14 @@ class ASCIIConfig(BaseModel):
 
 class ThemedTextures(BaseModel):
     """Themed textures configuration model."""
+
     dark: Path
     light: Path
 
 
 class PyGameTextures(BaseModel):
     """PyGame textures configuration model."""
+
     wall: ThemedTextures
     snake_head: ThemedTextures
     snake_body: ThemedTextures
@@ -121,6 +133,7 @@ class PyGameAudio(BaseModel):
 
 class Events(BaseModel):
     """Collisions configuration model."""
+
     death: int
     green_apple: int
     red_apple: int
@@ -130,6 +143,7 @@ class Events(BaseModel):
 
 class WinConditionsConfig(BaseModel):
     """Win conditions configuration model."""
+
     condition: Literal["max_snake_size", "last_snake_alive"]
     max_score: int = Field(
         gt=0, description="Max score must be greater than 0"
@@ -138,6 +152,7 @@ class WinConditionsConfig(BaseModel):
 
 class RulesConfig(BaseModel):
     """Rules configuration model."""
+
     events: Events
     steps_no_apple: int
     win_condition: WinConditionsConfig
@@ -145,6 +160,7 @@ class RulesConfig(BaseModel):
 
 class ExplorationConfig(BaseModel):
     """Exploration configuration model."""
+
     epsilon: float
     decay: float
     epsilon_min: float
@@ -152,6 +168,7 @@ class ExplorationConfig(BaseModel):
 
 class NeuralNetworkConfig(BaseModel):
     """Neural network configuration model."""
+
     batch_size: int
     epochs: int
     learning_rate: float
@@ -164,8 +181,10 @@ class NeuralNetworkConfig(BaseModel):
     patience: int
     min_delta: float
 
+
 class PathsConfig(BaseModel):
     """Paths configuration model."""
+
     models: Path
     logs: Path
     outputs: Path
@@ -175,6 +194,7 @@ class PathsConfig(BaseModel):
 
 class Config(BaseModel):
     """Main configuration model."""
+
     project: ProjectConfig
     logging: LoggingConfig
     map: MapConfig
@@ -191,8 +211,7 @@ class Config(BaseModel):
     def check_map_config(self: "Config") -> "Config":
         """Check if the map configuration is valid."""
         total_map_spaces: int = (
-            self.map.board_size.width
-            * self.map.board_size.height
+            self.map.board_size.width * self.map.board_size.height
         )
 
         walls: int = (
@@ -251,13 +270,13 @@ class Config(BaseModel):
     def verify_textures_exist(self: "Config") -> "Config":
         """Verify that all texture files exist."""
         textures_to_check: List[tuple[str, list[str]]] = [
-            ('wall', ['dark', 'light']),
-            ('snake_head', ['dark', 'light']),
-            ('snake_body', ['dark', 'light']),
-            ('green_apple', ['dark', 'light']),
-            ('red_apple', ['dark', 'light']),
-            ('empty', ['dark', 'light']),
-            ('backgrounds', ['dark', 'light']),
+            ("wall", ["dark", "light"]),
+            ("snake_head", ["dark", "light"]),
+            ("snake_body", ["dark", "light"]),
+            ("green_apple", ["dark", "light"]),
+            ("red_apple", ["dark", "light"]),
+            ("empty", ["dark", "light"]),
+            ("backgrounds", ["dark", "light"]),
         ]
 
         for texture_name, sub_textures in textures_to_check:
@@ -268,37 +287,37 @@ class Config(BaseModel):
                     raise FileNotFoundError(f"Texture file not found: {path}")
 
         return self
-    
+
     @model_validator(mode="after")
     def verify_audio_exists(self: "Config") -> "Config":
         """Verify that all audio files exist."""
         audio_to_check: List[str] = [
-            'home',
-            'game',
+            "home",
+            "game",
         ]
 
         for audio_name in audio_to_check:
             path = getattr(self.pygame_audio, audio_name)
             if not path.exists():
                 raise FileNotFoundError(f"Audio file not found: {path}")
-            
+
         return self
 
     @model_validator(mode="after")
     def verify_ai_models_exist(self: "Config") -> "Config":
         """Verify that all AI models exist."""
         models_to_check: List[str] = [
-            'easy',
-            'medium',
-            'hard',
-            'expert',
+            "easy",
+            "medium",
+            "hard",
+            "expert",
         ]
 
         for model_name in models_to_check:
             path = getattr(self.snake.difficulty, model_name)
             if not path.exists():
                 raise FileNotFoundError(f"AI model not found: {path}")
-            
+
         self.snake.selected_difficulty = self.snake.difficulty.expert
         return self
 

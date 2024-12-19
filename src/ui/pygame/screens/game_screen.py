@@ -1,3 +1,5 @@
+"""Game screen module."""
+
 from typing import List, Optional, Callable
 import pygame
 from pygame.event import Event
@@ -103,7 +105,7 @@ class GameScreen(BaseScreen):
     def start_human_vs_ai_game(self) -> None:
         self._reconfigure(2)
         if self.env:
-            self.game_controller = self.env.snakes[0].snake_controller 
+            self.game_controller = self.env.snakes[0].snake_controller
         self.human_score_widget = ScoreWidget(
             pos=(10, 10),
             size=(200, 100),

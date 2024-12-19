@@ -1,3 +1,5 @@
+"""Board widget for Pygame UI."""
+
 from typing import Tuple, List
 import pygame
 
@@ -21,7 +23,7 @@ class BoardWidget(Widget):
         game_board: List[List[str]] = kwargs.get("game_board", None)
         if not game_board:
             return
-        
+
         pygame.draw.rect(
             screen,
             (18, 90, 60),
@@ -32,7 +34,7 @@ class BoardWidget(Widget):
                 len(game_board) * self.size[1],
             ),
         )
-        
+
         for row_num, row in enumerate(game_board):
             for col_num, cell in enumerate(row):
                 texture: pygame.Surface = pygame.image.load(

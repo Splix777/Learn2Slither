@@ -1,3 +1,5 @@
+"""Keyboard handler module."""
+
 from pynput import keyboard
 
 
@@ -18,6 +20,7 @@ class KeyListener:
         self.listener.start()
 
     def on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
+        """Handle key press event."""
         from contextlib import suppress
 
         with suppress(AttributeError):
@@ -26,14 +29,7 @@ class KeyListener:
             self.current_key = self.key_map.get(char)
 
     def get_key(self) -> str | None:
+        """Get the current key."""
         key: str | None = self.current_key
         self.current_key = None
         return key
-
-
-if __name__ == "__main__":
-    key_listener = KeyListener()
-    while True:
-        key = key_listener.get_key()
-        if key is not None:
-            print(key)

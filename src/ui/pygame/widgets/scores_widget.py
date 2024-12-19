@@ -1,3 +1,5 @@
+"""ScoresWidget class definition."""
+
 from typing import Tuple
 import pygame
 
@@ -14,15 +16,7 @@ class ScoreWidget(Widget):
         textures: TextureLoader,
         snake_id: int,
     ):
-        """
-        Initialize the ScoreWidget.
-
-        :param pos: Position of the widget (x, y).
-        :param size: Size of the widget (width, height).
-        :param z: Z-index for rendering order.
-        :param textures: Instance of TextureLoader for loading textures.
-        :param snake_id: ID of the snake associated with this score widget.
-        """
+        """Initialize the ScoreWidget."""
         super().__init__(pos, size, z)
         self.textures = textures
         self.snake_id = snake_id
@@ -31,12 +25,7 @@ class ScoreWidget(Widget):
         )
 
     def render(self, screen: pygame.Surface, **kwargs) -> None:
-        """
-        Render the score widget on the screen.
-
-        :param screen: Pygame surface to render on.
-        :param kwargs: Additional parameters (expects 'score').
-        """
+        """Render the score widget on the screen."""
         score: int = kwargs.get("score", 0)
 
         # Draw rounded rectangle outline

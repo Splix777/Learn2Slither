@@ -19,9 +19,10 @@ docker-setup:
 
 # Start the application in Docker
 # docker compose run learn2slither /bin/bash
+# docker compose up -d
 docker-start:
 	docker compose up -d
-	docker compose exec learn2slither /bin/bash
+	docker compose exec -it --privileged learn2slither /bin/bash
 
 # Clean up Docker (removes all images, volumes, networks, containers)
 docker-clean:

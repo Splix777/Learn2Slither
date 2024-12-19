@@ -12,6 +12,8 @@ services:
     restart: on-failure
     stdin_open: true
     tty: true
+    devices:
+      - /dev/snd:/dev/snd
 
 networks:
   default:

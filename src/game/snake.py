@@ -1,3 +1,5 @@
+"""Snake class module."""
+
 import random
 from typing import Tuple, List, Optional
 from contextlib import suppress
@@ -36,7 +38,9 @@ class Snake:
         return f"Snake {self.id} - Size: {self.size} - Alive: {self.alive}"
 
     # Initialization
-    def initialize(self, start_pos: Tuple[int, int], start_dir: Direction) -> None:
+    def initialize(
+        self, start_pos: Tuple[int, int], start_dir: Direction
+    ) -> None:
         """Reset the snake to its initial state."""
         self.initialized = False
         self.size = self.config.snake.start_size

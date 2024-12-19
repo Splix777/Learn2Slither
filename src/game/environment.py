@@ -1,3 +1,5 @@
+"""Game Environment Module."""
+
 import random
 from typing import List, Tuple, Dict, Set
 from itertools import product
@@ -24,7 +26,7 @@ class Environment:
         self.num_snakes: int = len(snakes)
         if self.num_snakes < 1:
             raise ValueError("At least one snake is required.")
-        # <-- Initialize Map -->
+        # Initialize Map
         self.map: List[List[str]] = []
         self.reset()
 
@@ -63,12 +65,14 @@ class Environment:
 
     def _find_empty_cell(self, game_map: List[List[str]]) -> Tuple[int, int]:
         """Get a random empty position on the map."""
-        if not (empty_cells := [
-            (row, col)
-            for row in range(1, self.height - 1)
-            for col in range(1, self.width - 1)
-            if game_map[row][col] == "empty"
-        ]):
+        if not (
+            empty_cells := [
+                (row, col)
+                for row in range(1, self.height - 1)
+                for col in range(1, self.width - 1)
+                if game_map[row][col] == "empty"
+            ]
+        ):
             raise ValueError("No empty cells available.")
         else:
             return random.choice(empty_cells)
@@ -328,7 +332,6 @@ class Environment:
 
         return result
 
-
     def _normalize(self, value: int, max_value: int) -> float:
         """Normalize a value between 0 and 1."""
         return value / max_value if max_value != 0 else 0
@@ -345,14 +348,11 @@ class Environment:
             x, y = snake.head
             print(snake)
             print(f"Snake {i} - Head: {snake.head} - Body: {snake.body}")
-            print(f"Snake {i} - Nearby Risks: {self._assess_nearby_risks(x, y)}")
+            print(
+                f"Snake {i} - Nearby Risks: {self._assess_nearby_risks(x, y)}"
+            )
             print(f"Snake {i} - Apple in Sight: {self._apple_in_sight(x, y)}")
-            print(f"Snake {i} - Surroundings: {self._detect_surroundings(x, y, self.width)}")
-
-if __name__ == "__main__":
-    from src.config.settings import config
-
-    snakes = [Snake(0, config) for _ in range(1)]
-    env = Environment(config, snakes)
-    env.pretty_print_map()
-    env.view_snake_states()
+            print(
+                f"Snake {i} - "
+                f"Surroundings: {self._detect_surroundings(x, y, self.width)}"
+            )

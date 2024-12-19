@@ -1,3 +1,5 @@
+"""Direction Enum class for the game."""
+
 from enum import Enum
 from typing import List
 

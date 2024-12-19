@@ -1,3 +1,5 @@
+"""Command line interface for training and evaluating the snake AI."""
+
 from typing import Optional
 
 import typer
@@ -99,6 +101,18 @@ def evaluate(
 
     except KeyboardInterrupt:
         typer.echo("Evaluation interrupted by user.")
+    except Exception as e:
+        typer.echo(f"An error occurred: {e}")
+
+
+@app.command()
+def game() -> None:
+    try:
+        gui = PygameGUI(config)
+        gui.run()
+
+    except KeyboardInterrupt:
+        typer.echo("Game interrupted by user.")
     except Exception as e:
         typer.echo(f"An error occurred: {e}")
 

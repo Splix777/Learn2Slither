@@ -1,3 +1,5 @@
+"""Landing screen module for the Pygame UI."""
+
 from typing import List, Optional
 import pygame
 from pygame.event import Event
@@ -5,6 +7,7 @@ from time import time
 
 from src.config.settings import Config
 from src.ui.pygame.screens.base_screen import BaseScreen
+
 
 class LandingScreen(BaseScreen):
     def __init__(self, config: Config, theme: str) -> None:
@@ -29,7 +32,7 @@ class LandingScreen(BaseScreen):
         self.show_instructions = True
         self.next_sreen = None
 
-    def handle_input(self, events: List[Event]):
+    def handle_input(self, events: List[Event]) -> None:
         """Handle input to navigate to the home screen."""
         if next(
             (
@@ -50,7 +53,7 @@ class LandingScreen(BaseScreen):
             self.blink_start_time = current_time
 
     def render(self, screen: pygame.Surface) -> None:
-        """Render the landing screen."""     
+        """Render the landing screen."""
         screen.fill((30, 30, 30))
 
         background: pygame.Surface = pygame.image.load(

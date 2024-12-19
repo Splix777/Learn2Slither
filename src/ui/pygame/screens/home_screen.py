@@ -1,3 +1,5 @@
+"""Home screen module for the Pygame UI."""
+
 from typing import List, Optional
 
 import pygame

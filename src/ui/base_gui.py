@@ -1,7 +1,6 @@
 """Game manager module."""
 
 from abc import ABC, abstractmethod
-from typing import List
 
 
 class GUI(ABC):

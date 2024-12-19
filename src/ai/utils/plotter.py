@@ -1,13 +1,14 @@
+"""Plotter module."""
+
 import matplotlib.pyplot as plt
 from typing import List
 
 from src.config.settings import config
 
+
 class Plotter:
     def __init__(self) -> None:
-        """
-        Initializes the Plotter with empty lists for data tracking and sets up the interactive plot.
-        """
+        """Initializes the Plotter for data tracking."""
         self.episodes: List[int] = []
         self.rewards: List[float] = []
         self.scores: List[int] = []
@@ -43,15 +44,15 @@ class Plotter:
         self.axs[2].set_ylabel("Epsilon")
         self.axs[2].grid()
 
-    def update(self, episode: int, reward: float, score: int, top_score: int , epsilon: float) -> None:
-        """
-        Updates the plot data and redraws the plot.
-        Args:
-            episode (int): Current episode number.
-            reward (float): Total reward for the episode.
-            score (int): Final score for the episode.
-            epsilon (float): Current epsilon value.
-        """
+    def update(
+        self,
+        episode: int,
+        reward: float,
+        score: int,
+        top_score: int,
+        epsilon: float,
+    ) -> None:
+        """Updates the plot data and redraws the plot."""
         # Append new data
         self.episodes.append(episode)
         self.rewards.append(reward)
@@ -60,9 +61,10 @@ class Plotter:
         self.epsilons.append(epsilon)
 
         # Update each subplot
-        # Clear the Rewards subplot
         self.axs[0].cla()
-        self.axs[0].plot(self.episodes, self.rewards, label="Total Reward", color="blue")
+        self.axs[0].plot(
+            self.episodes, self.rewards, label="Total Reward", color="blue"
+        )
         self.axs[0].set_title("Rewards Over Episodes")
         self.axs[0].set_xlabel("Episodes")
         self.axs[0].set_ylabel("Total Reward")
@@ -70,7 +72,9 @@ class Plotter:
 
         # Clear the Scores subplot
         self.axs[1].cla()
-        self.axs[1].plot(self.episodes, self.scores, label="Score", color="orange")
+        self.axs[1].plot(
+            self.episodes, self.scores, label="Score", color="orange"
+        )
         self.axs[1].set_title("Scores Over Episodes")
         self.axs[1].set_xlabel("Episodes")
         self.axs[1].set_ylabel("Score")
@@ -78,15 +82,19 @@ class Plotter:
 
         # Clear the Top Score subplot
         self.axs[2].cla()
-        self.axs[2].plot(self.episodes, self.top_score, label="Top Score", color="red")
+        self.axs[2].plot(
+            self.episodes, self.top_score, label="Top Score", color="red"
+        )
         self.axs[2].set_title("Top Score Over Episodes")
         self.axs[2].set_xlabel("Episodes")
         self.axs[2].set_ylabel("Top Score")
         self.axs[2].grid()
 
         # Clear the Epsilon subplot
-        self.axs[3].cla() 
-        self.axs[3].plot(self.episodes, self.epsilons, label="Epsilon", color="green")
+        self.axs[3].cla()
+        self.axs[3].plot(
+            self.episodes, self.epsilons, label="Epsilon", color="green"
+        )
         self.axs[3].set_title("Epsilon Decay")
         self.axs[3].set_xlabel("Episodes")
         self.axs[3].set_ylabel("Epsilon")
@@ -97,9 +105,7 @@ class Plotter:
         self.fig.canvas.flush_events()
 
     def close(self) -> None:
-        """
-        Closes the interactive plot window.
-        """
+        """Closes the interactive plot window."""
         plt.ioff()
         plt.savefig(config.paths.outputs / "training_progress.png")
         plt.close()
