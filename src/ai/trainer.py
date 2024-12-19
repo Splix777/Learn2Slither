@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Optional, Tuple
 
@@ -9,14 +10,14 @@ from rich.progress import (
     TimeElapsedColumn,
     TaskID,
 )
+from rich.prompt import Prompt
 
 from src.ui.pygame.pygame_gui import PygameGUI
 from src.ai.utils.plotter import Plotter
 from src.game.snake import Snake
-from src.ai.agent import Agent
 from src.game.environment import Environment
 from src.ai.utils.early_stop import EarlyStop
-from src.config.settings import Config, config
+from src.config.settings import Config
 
 
 class ReinforcementLearner:
@@ -24,14 +25,18 @@ class ReinforcementLearner:
         self,
         config: Config,
         env: Environment,
+        early_stop: Optional[bool] = None,
         plotter: Optional[Plotter] = None,
         gui: Optional[PygameGUI] = None,
+        save_path: Optional[str] = None,
     ) -> None:
         """Initializes the AI agent for Snake."""
         self.config: Config = config
         self.env: Environment = env
+        self.early_stop: bool | None = early_stop
         self.gui: PygameGUI | None = gui
         self.plotter: Plotter | None = plotter
+        self.save_path: str | None = save_path
 
     # Training
     def train_epoch(self, fast: bool) -> Tuple:
@@ -76,7 +81,8 @@ class ReinforcementLearner:
     def train(self, fast: bool = True) -> None:
         """Trains the agent over multiple epochs."""
         early_stop = EarlyStop(
-            patience=config.nn.patience, min_delta=config.nn.min_delta
+            patience=self.config.nn.patience,
+            min_delta=self.config.nn.min_delta,
         )
         best_score: int = 0
         best_time: float = 0
@@ -98,7 +104,7 @@ class ReinforcementLearner:
                 )
 
                 early_stop(loss, self.env.snakes[0].brain)
-                if early_stop.early_stop:
+                if early_stop.early_stop and self.early_stop:
                     progress.update(
                         task,
                         description="Early Stopping Detected",
@@ -110,34 +116,38 @@ class ReinforcementLearner:
                         epsilon=epsilon,
                     )
                     for snake in self.env.snakes:
-                        if snake.brain:
-                            snake.brain.save(
-                                config.paths.models / "snake_brain.pth"
-                            )
+                        self._save_model(snake, "snake_brain.pth")
                     break
 
                 for snake in self.env.snakes:
                     if snake.brain:
                         epsilon = min(epsilon, snake.brain.epsilon)
-
                 if self.plotter:
                     self.plotter.update(
                         epoch, reward, score, best_score, epsilon
                     )
-
                 if epoch in [10, 50, 100]:
                     for snake in self.env.snakes:
-                        if snake.brain:
-                            snake.brain.save(
-                                config.paths.models
-                                / f"snake_brain_{epoch}.pth"
-                            )
+                        self._save_model(snake, f"snake_brain_{epoch}.pth")
 
         if self.plotter:
             self.plotter.close()
+        if self.save_path:
+            for snake in self.env.snakes:
+                self._save_model(snake, self.save_path)
+
+    def _save_model(self, snake: Snake, file_name: str) -> None:
+        """Saves the model at a given epoch."""
+        if snake.brain:
+            snake.brain.save(self.config.paths.models / file_name)
 
     @torch.no_grad()
-    def evaluate(self, test_episodes: int = 5, fast: bool = True) -> None:
+    def evaluate(
+        self,
+        test_episodes: int = 5,
+        fast: bool = False,
+        step_by_step: bool = False,
+    ) -> None:
         """Evaluates the agent's performance over multiple episodes."""
         avg_score: float = 0
         best_run: int = 0
@@ -158,6 +168,12 @@ class ReinforcementLearner:
                     if self.gui:
                         self.gui.render_map(self.env)
 
+                    if step_by_step:
+                        step = Prompt.ask("", default="")
+                        os.system("clear" if os.name == "posix" else "cls")
+                        if step.lower() in ["q", "quit", "exit"]:
+                            return
+
                     if all(not snake.alive for snake in self.env.snakes):
                         avg_score += max_score
                         best_run = max(best_run, max_score)
@@ -171,8 +187,8 @@ class ReinforcementLearner:
                         )
                         break
 
-                if not fast:
-                    time.sleep(0.1)
+                    if not fast:
+                        time.sleep(0.1)
 
     def _set_eval_pb(self) -> Progress:
         """Sets the progress bar for evaluation."""
@@ -218,39 +234,3 @@ class ReinforcementLearner:
             avg_loss=0,
             epsilon=self.config.nn.exploration.epsilon,
         )
-
-
-# Just for Testing
-if __name__ == "__main__":
-    gui = None
-    gui = PygameGUI(
-        config, 
-        (
-            config.map.board_size.width * config.pygame_textures.texture_size,
-            config.map.board_size.height * config.pygame_textures.texture_size,
-        ))
-    plotter = None
-    plotter = Plotter()
-
-    brain = Agent(config=config)
-    snake1 = Snake(1, brain=brain, config=config)
-    snake2 = Snake(2, brain=brain, config=config)
-    env = Environment(config, [snake1])
-    interpreter = ReinforcementLearner(
-        config=config,
-        gui=gui or None,
-        env=env,
-        plotter=plotter,
-    )
-
-    try:
-        interpreter.train()
-        best_model = config.snake.difficulty.expert
-        # best_model = config.paths.models / "snake_brain.pth"
-        if snake1.brain:
-            snake1.brain.load(best_model)
-        interpreter.evaluate(100, fast=True)
-    except KeyboardInterrupt:
-        pass
-    except Exception as e:
-        print(e)

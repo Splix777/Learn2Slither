@@ -102,4 +102,4 @@ class Plotter:
         """
         plt.ioff()
         plt.savefig(config.paths.outputs / "training_progress.png")
-        plt.show()
+        plt.close()

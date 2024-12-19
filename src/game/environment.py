@@ -226,8 +226,7 @@ class Environment:
         for snake in self.snakes:
             snake.move(self.get_state(snake))
             self._process_collision_events(snake)
-
-        self._update_map()
+            self._update_map()
 
     # State Representation
     def get_state(self, snake: Snake) -> torch.Tensor:
@@ -283,7 +282,7 @@ class Environment:
         return result
 
     def _detect_surroundings(self, x: int, y: int, view: int) -> torch.Tensor:
-        """Detect surrounding within a view range."""
+        """Detect surroundings within a view range."""
         # 4 directions * 3 features (obstacle, green apple, red apple)
         result = torch.zeros(12, dtype=torch.float)
         max_lookahead = min(view, max(self.width, self.height))
@@ -305,26 +304,30 @@ class Environment:
                         step, max(self.width, self.height)
                     )
                     break
-                # 3. If apple detected, set the corresponding flag
+                # 3. If green apple detected, set both obstacle and apple flag
                 elif cell == "green_apple":
-                    result[index * 3 + 1] = 1.0
-                    if step > 1:
-                        result[index * 3] = self._normalize(
-                            step - 1, max(self.width, self.height)
-                        )
+                    result[index * 3] = self._normalize(
+                        step - 1, max(self.width, self.height)
+                    )
+                    result[index * 3 + 1] = self._normalize(
+                        step, max(self.width, self.height)
+                    )
                     break
-                # 4. If red apple detected, set the corresponding flag
+                # 4. If red apple detected, set both obstacle and apple flag
                 elif cell == "red_apple":
-                    result[index * 3 + 2] = 1.0
-                    if step > 1:
-                        result[index * 3] = self._normalize(
-                            step - 1, max(self.width, self.height)
-                        )
+                    result[index * 3] = self._normalize(
+                        step - 1, max(self.width, self.height)
+                    )
+                    result[index * 3 + 2] = self._normalize(
+                        step, max(self.width, self.height)
+                    )
                     break
             else:
+                # If no obstacles within the range, set obstacle flag to max
                 result[index * 3] = 1.0
 
         return result
+
 
     def _normalize(self, value: int, max_value: int) -> float:
         """Normalize a value between 0 and 1."""
@@ -336,6 +339,15 @@ class Environment:
         for row in self.map:
             print("".join([cell[:2] for cell in row]))
 
+    def view_snake_states(self) -> None:
+        """Print the state of each snake."""
+        for i, snake in enumerate(self.snakes):
+            x, y = snake.head
+            print(snake)
+            print(f"Snake {i} - Head: {snake.head} - Body: {snake.body}")
+            print(f"Snake {i} - Nearby Risks: {self._assess_nearby_risks(x, y)}")
+            print(f"Snake {i} - Apple in Sight: {self._apple_in_sight(x, y)}")
+            print(f"Snake {i} - Surroundings: {self._detect_surroundings(x, y, self.width)}")
 
 if __name__ == "__main__":
     from src.config.settings import config
@@ -343,5 +355,4 @@ if __name__ == "__main__":
     snakes = [Snake(0, config) for _ in range(1)]
     env = Environment(config, snakes)
     env.pretty_print_map()
-    env.step()
-    env.pretty_print_map()
+    env.view_snake_states()

@@ -181,7 +181,7 @@ class Config(BaseModel):
     snake: SnakeConfig
     visual: VisualConfig
     ascii: ASCIIConfig
-    pygame_textures: PyGameTextures
+    textures: PyGameTextures
     pygame_audio: PyGameAudio
     rules: RulesConfig
     nn: NeuralNetworkConfig
@@ -230,7 +230,7 @@ class Config(BaseModel):
         self.paths.textures = root_path / self.paths.textures
         self.paths.audio = root_path / self.paths.audio
 
-        for texture in vars(self.pygame_textures).values():
+        for texture in vars(self.textures).values():
             if isinstance(texture, ThemedTextures):
                 texture.dark = self.paths.textures / texture.dark
                 texture.light = self.paths.textures / texture.light
@@ -261,7 +261,7 @@ class Config(BaseModel):
         ]
 
         for texture_name, sub_textures in textures_to_check:
-            texture = getattr(self.pygame_textures, texture_name)
+            texture = getattr(self.textures, texture_name)
             for sub_texture in sub_textures:
                 path = getattr(texture, sub_texture)
                 if not path.exists():

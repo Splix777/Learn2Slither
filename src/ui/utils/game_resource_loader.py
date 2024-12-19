@@ -64,11 +64,11 @@ class TextureLoader:
     def load_pygame_textures(self) -> dict[str, Path]:
         return {
             key: getattr(
-                getattr(self.config.pygame_textures, key), self.theme
+                getattr(self.config.textures, key), self.theme
             )
             for key in self.KEYS
         }
 
     @property
     def texture_size(self) -> int:
-        return self.config.pygame_textures.texture_size
+        return self.config.textures.texture_size

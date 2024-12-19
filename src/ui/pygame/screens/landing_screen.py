@@ -54,9 +54,9 @@ class LandingScreen(BaseScreen):
         screen.fill((30, 30, 30))
 
         background: pygame.Surface = pygame.image.load(
-            self.config.pygame_textures.backgrounds.dark
+            self.config.textures.backgrounds.dark
             if self.theme == "dark"
-            else self.config.pygame_textures.backgrounds.light
+            else self.config.textures.backgrounds.light
         )
         screen.blit(
             pygame.transform.scale(background, screen.get_size()), (0, 0)

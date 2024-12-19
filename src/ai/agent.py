@@ -31,6 +31,8 @@ class Agent(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(config.nn.input_shape, 128),
             nn.LeakyReLU(0.01),
+            # nn.Linear(128, 64),
+            # nn.Dropout(0.1),
             nn.Linear(128, config.nn.output_shape),
         )
         self.optimizer = torch.optim.Adam(
@@ -39,7 +41,7 @@ class Agent(nn.Module):
             amsgrad=True,
             weight_decay=1e-5,
         )
-        self.criterion = nn.SmoothL1Loss(beta=0.9)
+        self.criterion = nn.SmoothL1Loss(beta=0.8)
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
@@ -71,11 +73,13 @@ class Agent(nn.Module):
             1, action.unsqueeze(1)
         ).squeeze(1)
 
-        loss: torch.Tensor = self.criterion(q_values_for_actions, target_q_values)
+        loss: torch.Tensor = self.criterion(
+            q_values_for_actions, target_q_values
+        )
         self.loss_value = loss.item()
         self.optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1)
+        # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1)
         self.optimizer.step()
 
     def replay(self) -> None:

@@ -16,8 +16,7 @@ from src.game.environment import Environment
 
 class PygameGUI(GUI):
     def __init__(self, config: Config, size: Optional[tuple[int, int]] = None) -> None:
-        self.config = config
-        # self.theme = config.visual.themes.selected_theme
+        self.config: Config = config
         self.textures = TextureLoader(config)
 
         pygame.init()
@@ -50,9 +49,8 @@ class PygameGUI(GUI):
         }
         self.current_screen = self.screens["landing"]()
 
-        # Set window title and icon
         pygame.display.set_caption("Battle Snakes")
-        icon = pygame.image.load(config.pygame_textures.green_apple.dark)
+        icon = pygame.image.load(config.textures.green_apple.dark)
         pygame.display.set_icon(icon)
         self.running = True
 
@@ -61,15 +59,12 @@ class PygameGUI(GUI):
             events = pygame.event.get()
             self.handle_global_events(events)
 
-            # Get next screen or actions from current screen
             if next_screen_name := self.current_screen.get_next_screen():
                 self.transition_to_screen(next_screen_name)
 
-            # Handle screen-specific logic
             self.current_screen.handle_input(events)
             self.current_screen.update()
 
-            # Render
             self.current_screen.render(self.screen)
             self.render_fps(self.screen)
 
@@ -103,13 +98,13 @@ class PygameGUI(GUI):
             if event.type == pygame.QUIT:
                 self.running = False
 
-            # Handle global keyboard events
             keys: ScancodeWrapper = pygame.key.get_pressed()
             if keys[pygame.K_ESCAPE]:
                 if isinstance(self.current_screen, GameScreen):
                     self.current_screen.return_home()
                 else:
                     self.running = False
+                    pygame.quit()
 
     def resize_screen(self, new_size: tuple[int, int]) -> None:
         """Resize the screen."""
@@ -143,8 +138,12 @@ class PygameGUI(GUI):
 
     def render_map(self, env: Environment) -> None:
         """Render the game environment with the map centered."""
+        if not pygame.display.get_active():
+            return   
+     
         events = pygame.event.get()
         self.handle_global_events(events)
+        
         if not self.screen:
             return
 
