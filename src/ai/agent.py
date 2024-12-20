@@ -79,7 +79,6 @@ class Agent(nn.Module):
         self.loss_value = loss.item()
         self.optimizer.zero_grad()
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1)
         self.optimizer.step()
 
     def replay(self) -> None:

@@ -18,8 +18,6 @@ docker-setup:
 	docker compose build
 
 # Start the application in Docker
-# docker compose run learn2slither /bin/bash
-# docker compose up -d
 docker-start:
 	docker compose up -d
 	docker compose exec -it --privileged learn2slither /bin/bash
@@ -38,12 +36,13 @@ $(VENV_NAME):
 	python3 -m venv $(VENV_NAME)
 
 # Start the application locally
-start:
-	$(PYTHON) cli.py
+game:
+	docker compose up -d
+	docker compose exec -it --privileged learn2slither python3 /app/snake_cli.py game
 
-# Stop the application (placeholder for future use)
+# Stop the application
 stop:
-	@echo "Stop command not implemented."
+	docker compose down
 
 # Clean up
 clean:

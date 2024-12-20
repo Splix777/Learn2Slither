@@ -83,18 +83,18 @@ rules:
     red_apple: -1
     looping: -1
     kill: 1
-  steps_no_apple: 100
+  steps_no_apple: 150
   win_condition:
     condition: max_snake_size
     max_score: 10
 
 nn:
-  batch_size: 64
+  batch_size: 32
   epochs: 1_000
   learning_rate: 0.001
   exploration:
     epsilon: 0.99
-    decay: 0.99
+    decay: 0.95
     epsilon_min: 0.05
   gamma: 0.95
   update_frequency: 10
@@ -102,7 +102,7 @@ nn:
   output_shape: 4
   memory_size: 200_000
   patience: 100
-  min_delta: 0.001
+  min_delta: 0.0001
     
 paths:
   models: models

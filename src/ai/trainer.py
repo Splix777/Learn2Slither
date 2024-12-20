@@ -171,6 +171,7 @@ class ReinforcementLearner:
                         self.gui.render_map(self.env)
 
                     if step_by_step:
+                        self.env.snake_views_map()
                         step = Prompt.ask("", default="")
                         os.system("clear" if os.name == "posix" else "cls")
                         if step.lower() in ["q", "quit", "exit"]:

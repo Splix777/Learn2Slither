@@ -1,5 +1,6 @@
 """PyGame GUI implementation."""
 
+import os
 from typing import List, Optional
 
 import pygame
@@ -22,34 +23,27 @@ class PygameGUI(GUI):
     ) -> None:
         self.config: Config = config
         self.textures = TextureLoader(config)
+        self.theme = config.visual.themes.selected_theme
 
+        self.music_on = False
         pygame.init()
-        pygame.mixer.init()
-        self.music_on = True
-        self.load_background_music("home")
+        if not self.is_running_in_docker():
+            pygame.mixer.init()
+            self.music_on = True
+            self.load_background_music("home")
 
         self.current_resolution = size or (1360, 960)
         self.screen = pygame.display.set_mode(self.current_resolution)
         self.clock = pygame.time.Clock()
 
         self.screens = {
-            "landing": lambda: LandingScreen(
-                config, self.config.visual.themes.selected_theme
-            ),
-            "home": lambda: HomeScreen(
-                config, self.config.visual.themes.selected_theme
-            ),
+            "landing": lambda: LandingScreen(config, self.theme),
+            "home": lambda: HomeScreen(config, self.theme),
             "human_vs_ai": lambda: GameScreen(
-                config,
-                self.config.visual.themes.selected_theme,
-                "human_vs_ai",
+                config, self.theme, "human_vs_ai"
             ),
-            "ai_solo": lambda: GameScreen(
-                config, self.config.visual.themes.selected_theme, "ai_solo"
-            ),
-            "options": lambda: OptionsScreen(
-                config, self.config.visual.themes.selected_theme, self
-            ),
+            "ai_solo": lambda: GameScreen(config, self.theme, "ai_solo"),
+            "options": lambda: OptionsScreen(config, self.theme, self),
         }
         self.current_screen = self.screens["landing"]()
 
@@ -79,10 +73,11 @@ class PygameGUI(GUI):
         if screen_name not in self.screens:
             raise ValueError(f"Unknown screen: {screen_name}")
         self.current_screen = self.screens[screen_name]()
-        if isinstance(self.current_screen, LandingScreen | HomeScreen):
-            self.load_background_music("home")
-        elif isinstance(self.current_screen, GameScreen):
-            self.load_background_music("game")
+        if not self.is_running_in_docker():
+            if isinstance(self.current_screen, LandingScreen | HomeScreen):
+                self.load_background_music("home")
+            elif isinstance(self.current_screen, GameScreen):
+                self.load_background_music("game")
 
     def render_fps(self, screen: pygame.Surface) -> None:
         """Render the FPS counter in the top-right corner."""
@@ -176,9 +171,5 @@ class PygameGUI(GUI):
 
         pygame.display.update()
 
-
-if __name__ == "__main__":
-    from src.config.settings import config
-
-    gui = PygameGUI(config)
-    gui.run()
+    def is_running_in_docker(self) -> bool:
+        return os.path.exists("/.dockerenv")

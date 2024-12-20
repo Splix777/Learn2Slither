@@ -113,8 +113,8 @@ def game() -> None:
 
     except KeyboardInterrupt:
         typer.echo("Game interrupted by user.")
-    except Exception as e:
-        typer.echo(f"An error occurred: {e}")
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

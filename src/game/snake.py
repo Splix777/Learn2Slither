@@ -33,6 +33,10 @@ class Snake:
         self.movement_direction: Direction = Direction.UP
         self.initialized: bool = False
 
+    def __str__(self) -> str:
+        """Return the snake's string representation."""
+        return f"Snake {self.id} - Size: {self.size} - Alive: {self.alive}"
+
     def __repr__(self) -> str:
         """Return the snake's representation."""
         return f"Snake {self.id} - Size: {self.size} - Alive: {self.alive}"

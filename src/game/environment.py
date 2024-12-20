@@ -356,3 +356,39 @@ class Environment:
                 f"Snake {i} - "
                 f"Surroundings: {self._detect_surroundings(x, y, self.width)}"
             )
+
+    def snake_views_map(self) -> None:
+        """Print the map from the perspective of each snake."""
+        for snake in self.snakes:
+            if snake.alive:
+                print(
+                    f"Snake {snake.id} - "
+                    f"Current Direction: {snake.movement_direction}\n"
+                )
+
+                x, y = snake.head
+                view = self._detect_surroundings(x, y, self.width)
+
+                for i, direction in enumerate(Direction):
+                    dr, dc = direction.value
+                    print(f"View: {direction}")
+                    for step in range(1, max(self.width, self.height)):
+                        nx, ny = x + dr * step, y + dc * step
+
+                        if not (
+                            0 <= nx < self.height and 0 <= ny < self.width
+                        ):
+                            break
+
+                        cell = self.map[nx][ny]
+                        print(f"Step {step} - Cell: {cell}")
+
+                    obstacle = view[i * 3]
+                    green_apple = view[i * 3 + 1]
+                    red_apple = view[i * 3 + 2]
+
+                    print(
+                        f"Obstacle: {obstacle:.2f} - "
+                        f"Green Apple: {green_apple:.2f} - "
+                        f"Red Apple: {red_apple:.2f}\n"
+                    )
