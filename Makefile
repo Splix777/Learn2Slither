@@ -5,13 +5,13 @@ PIP := $(VENV_NAME)/bin/pip
 REQUIREMENTS := requirements.txt
 LOGS := logs
 
-.PHONY: all setup docker-setup start docker-start docker-clean docker stop clean
+.PHONY: all setup docker-setup start docker-start docker-clean docker stop x11-setup x11-clean clean
 
 # Default target
 all: docker
 
 # Dockerized setup and start combined
-docker: docker-setup docker-start
+docker: x11-setup docker-setup docker-start
 
 # Dockerized setup
 docker-setup:
@@ -20,7 +20,7 @@ docker-setup:
 # Start the application in Docker
 docker-start:
 	docker compose up -d
-	docker compose exec -it --privileged learn2slither /bin/bash
+	docker compose exec --privileged learn2slither /bin/bash
 
 # Clean up Docker (removes all images, volumes, networks, containers)
 docker-clean:
@@ -44,7 +44,18 @@ game:
 stop:
 	docker compose down
 
+# X11
+x11-setup:
+	@echo "Setting up X11..."
+	@xhost +local:docker
+
+x11-clean:
+	@echo "Cleaning up X11..."
+	@xhost -local:docker
+
 # Clean up
 clean:
+	@echo "Cleaning up..."
+	x11-clean
 	rm -rf $(VENV_NAME)
 	rm -rf $(LOGS)

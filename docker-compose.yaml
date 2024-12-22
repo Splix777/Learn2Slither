@@ -7,13 +7,16 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev/snd:/dev/snd
     networks:
       - default
+    environment:
+      - DISPLAY=$DISPLAY
+      - /tmp/.X11-unix:/tmp/.X11-unix    
     restart: on-failure
     stdin_open: true
     tty: true
-    devices:
-      - /dev/snd:/dev/snd
 
 networks:
   default:
