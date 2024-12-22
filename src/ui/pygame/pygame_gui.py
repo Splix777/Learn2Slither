@@ -126,10 +126,11 @@ class PygameGUI(GUI):
     def toggle_music(self) -> None:
         """Toggle the music on or off."""
         self.music_on = not self.music_on
-        if self.music_on:
-            pygame.mixer.music.unpause()
-        else:
-            pygame.mixer.music.pause()
+        if not self.is_running_in_docker():
+            if self.music_on:
+                pygame.mixer.music.unpause()
+            else:
+                pygame.mixer.music.pause()
 
     def set_music_volume(self, volume: float) -> None:
         """Set the volume of the background music."""

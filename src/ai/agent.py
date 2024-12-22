@@ -31,8 +31,6 @@ class Agent(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(config.nn.input_shape, 128),
             nn.LeakyReLU(0.01),
-            # nn.Linear(128, 64),
-            # nn.Dropout(0.1),
             nn.Linear(128, config.nn.output_shape),
         )
         self.optimizer = torch.optim.Adam(
