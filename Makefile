@@ -54,8 +54,7 @@ x11-clean:
 	@xhost -local:docker
 
 # Clean up
-clean:
+clean: x11-clean stop docker-clean
 	@echo "Cleaning up..."
-	x11-clean
-	rm -rf $(VENV_NAME)
-	rm -rf $(LOGS)
+	@rm -rf $(VENV_NAME)
+	@rm -rf $(LOGS)
