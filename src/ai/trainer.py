@@ -76,7 +76,7 @@ class ReinforcementLearner:
                 break
 
             if not fast:
-                time.sleep(0.1)
+                time.sleep(0.3)
 
         return tscore, best_time, total_rewards, avg_loss, epsilon
 
@@ -154,11 +154,13 @@ class ReinforcementLearner:
         avg_score: float = 0
         best_run: int = 0
         max_score: int = 0
+        best_time: float = 0
 
         with self._set_eval_pb() as progress:
             task: TaskID = self._eval_task(progress, test_episodes)
             for i in range(test_episodes):
                 self.env.reset()
+                start_time: float = time.time()
 
                 while True:
                     self.env.step()
@@ -181,17 +183,20 @@ class ReinforcementLearner:
                         avg_score += max_score
                         best_run = max(best_run, max_score)
                         current_avg = avg_score / (i + 1)
+                        elapsed_time: float = time.time() - start_time
+                        best_time = max(best_time, elapsed_time)
                         progress.update(
                             task,
                             advance=1,
                             episode=i + 1,
                             best_run=best_run,
                             avg_score=current_avg,
+                            best_time=best_time
                         )
                         break
 
                     if not fast:
-                        time.sleep(0.1)
+                        time.sleep(0.3)
 
     def _set_eval_pb(self) -> Progress:
         """Sets the progress bar for evaluation."""
@@ -200,6 +205,7 @@ class ReinforcementLearner:
             TextColumn("• Episode: {task.fields[episode]}"),
             TextColumn("• Best Run: {task.fields[best_run]}"),
             TextColumn("• Avg Score: {task.fields[avg_score]:.2f}"),
+            TextColumn("• Best Time: {task.fields[best_time]:.2f}s"),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn(),
         )
@@ -207,7 +213,12 @@ class ReinforcementLearner:
     def _eval_task(self, progress: Progress, total: int) -> TaskID:
         """Creates a task for the progress bar."""
         return progress.add_task(
-            "Evaluation", total=total, episode=0, best_run=0, avg_score=0
+            "Evaluation",
+            total=total,
+            episode=0,
+            best_run=0,
+            avg_score=0,
+            best_time=0,
         )
 
     def _set_train_pb(self) -> Progress:

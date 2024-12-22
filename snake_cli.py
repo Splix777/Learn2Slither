@@ -117,5 +117,41 @@ def game() -> None:
         typer.echo(f"An error occurred: {e}")
 
 
+@app.command()
+def battle_royale(
+    episodes: int = 1,
+    fast: bool = False,
+    step_by_step: bool = False,
+) -> None:
+    try:
+        config.map.board_size.width = 30
+        config.map.board_size.height = 30
+        config.map.green_apples = 10
+        config.map.red_apples = 5
+        gui = PygameGUI(
+            config,
+            (
+                config.map.board_size.width * config.textures.texture_size,
+                config.map.board_size.height * config.textures.texture_size,
+            ),
+        )
+        mono_brain = Agent(config, config.snake.difficulty.expert)
+        snakes: list[Snake] = [
+            Snake(i, brain=mono_brain, config=config) for i in range(10)
+        ]
+        env = Environment(config, snakes)
+        trainer = ReinforcementLearner(config=config, env=env, gui=gui)
+        trainer.evaluate(
+            test_episodes=episodes,
+            fast=fast,
+            step_by_step=step_by_step,
+        )
+
+    except KeyboardInterrupt:
+        typer.echo("Game interrupted by user.")
+    except Exception as e:
+        typer.echo(f"An error occurred: {e}")
+
+
 if __name__ == "__main__":
     app()

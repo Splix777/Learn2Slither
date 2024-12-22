@@ -203,11 +203,11 @@ class Environment:
             self._process_collision_events(snake)
 
             buffer[index] = (state, action, snake.reward, not snake.alive)
+            self._update_map()
 
         next_states = [self.get_state(snake) for snake in self.snakes]
 
         self._save_to_cache(buffer, next_states)
-        self._update_map()
 
     def _save_to_cache(self, buffer: Dict, next_states: List[torch.Tensor]):
         """Save the current buffer & next state to the replay buffer."""

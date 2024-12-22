@@ -78,8 +78,8 @@ pygame_audio:
 
 rules:
   events:
-    death: -10
-    green_apple: 5
+    death: -100
+    green_apple: 50
     red_apple: -1
     looping: -1
     kill: 1
@@ -89,7 +89,7 @@ rules:
     max_score: 10
 
 nn:
-  batch_size: 32
+  batch_size: 64
   epochs: 1_000
   learning_rate: 0.001
   exploration:
