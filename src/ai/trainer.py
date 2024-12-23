@@ -153,12 +153,12 @@ class ReinforcementLearner:
         """Evaluates the agent's performance over multiple episodes."""
         avg_score: float = 0
         best_run: int = 0
-        max_score: int = 0
         best_time: float = 0
 
         with self._set_eval_pb() as progress:
             task: TaskID = self._eval_task(progress, test_episodes)
             for i in range(test_episodes):
+                max_score: int = 0
                 self.env.reset()
                 start_time: float = time.time()
 

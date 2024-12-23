@@ -26,7 +26,11 @@ from src.ui.pygame.pygame_gui import PygameGUI
 app = typer.Typer(help="Snake AI Training and Evaluation Tool")
 console = Console()
 
-def setup_gui(board_width: int, board_height: int) -> PygameGUI:
+
+def setup_gui(
+    board_width: Optional[int] = None,
+    board_height: Optional[int] = None
+) -> PygameGUI:
     """Initialize and return a pygame GUI instance."""
     return PygameGUI(
         config,
@@ -34,7 +38,8 @@ def setup_gui(board_width: int, board_height: int) -> PygameGUI:
             board_width * config.textures.texture_size,
             board_height * config.textures.texture_size,
         ),
-    )
+    ) if board_width or board_height else PygameGUI(config)
+
 
 def create_trainer(
     config,
@@ -55,6 +60,7 @@ def create_trainer(
         gui=gui,
         save_path=save_path,
     )
+
 
 @app.command()
 def train(
@@ -93,9 +99,12 @@ def train(
     """Train a new snake AI model."""
     try:
         config.nn.epochs = sessions or config.nn.epochs
-        gui = setup_gui(config.map.board_size.width, config.map.board_size.height) if visualize else None
+        gui = setup_gui(
+            config.map.board_size.width,
+            config.map.board_size.height
+        ) if visualize else None
         plotter = Plotter() if plot else None
-        
+
         snake = Snake(0, brain=Agent(config), config=config)
         trainer = create_trainer(
             config,
@@ -106,9 +115,9 @@ def train(
             save_path=str(save) if save else None
         )
 
-        with console.status("[bold green]Training in progress..."):
-            trainer.train(fast)
-        
+        console.status("[bold green]Training in progress...")
+        trainer.train(fast)
+
         rprint("[bold green]Training completed successfully!")
 
     except KeyboardInterrupt:
@@ -116,6 +125,7 @@ def train(
     except Exception as e:
         rprint(f"[red]An error occurred: {e}")
         raise typer.Exit(code=1)
+
 
 @app.command()
 def evaluate(
@@ -164,14 +174,20 @@ def evaluate(
         gui = setup_gui(map_size, map_size) if visualize else None
 
         if step_by_step:
-            rprint("[yellow]Press Enter to step through the evaluation or Ctrl+C to quit.")
+            rprint(
+                "[yellow]Press Enter to step through or Ctrl+C to quit."
+            )
 
-        snake = Snake(0, brain=Agent(config, str(load) if load else None), config=config)
+        snake = Snake(
+            0,
+            brain=Agent(config, str(load) if load else None),
+            config=config
+        )
         trainer = create_trainer(config, snake, gui=gui)
 
-        with console.status("[bold green]Evaluating model..."):
-            trainer.evaluate(episodes, fast, step_by_step)
-        
+        console.status("[bold green]Evaluating model...")
+        trainer.evaluate(episodes, fast, step_by_step)
+
         rprint("[bold green]Evaluation completed successfully!")
 
     except KeyboardInterrupt:
@@ -180,19 +196,21 @@ def evaluate(
         rprint(f"[red]An error occurred: {e}")
         raise typer.Exit(code=1)
 
+
 @app.command()
 def game():
     """Run the snake game in human-playable mode."""
     try:
-        gui = setup_gui(config.map.board_size.width, config.map.board_size.height)
+        gui = setup_gui()
         with console.status("[bold green]Starting game..."):
             gui.run()
-        
+
     except KeyboardInterrupt:
         rprint("[yellow]Game interrupted by user.")
     except Exception as e:
         rprint(f"[red]An error occurred: {e}")
         raise typer.Exit(code=1)
+
 
 @app.command()
 def battle_royale(
@@ -221,17 +239,17 @@ def battle_royale(
         gui = setup_gui(30, 30)
         mono_brain = Agent(config, config.snake.difficulty.expert)
         snakes = [Snake(i, brain=mono_brain, config=config) for i in range(10)]
-        
+
         env = Environment(config, snakes)
         trainer = ReinforcementLearner(config=config, env=env, gui=gui)
 
-        with console.status("[bold green]Running battle royale..."):
-            trainer.evaluate(
-                test_episodes=episodes,
-                fast=fast,
-                step_by_step=step_by_step,
-            )
-        
+        console.status("[bold green]Running battle royale...")
+        trainer.evaluate(
+            test_episodes=episodes,
+            fast=fast,
+            step_by_step=step_by_step,
+        )
+
         rprint("[bold green]Battle royale completed successfully!")
 
     except KeyboardInterrupt:
@@ -240,13 +258,16 @@ def battle_royale(
         rprint(f"[red]An error occurred: {e}")
         raise typer.Exit(code=1)
 
+
 def main():
     """Entry point for the CLI application."""
     try:
         app()
-    except Exception as e:
+
+    except Exception:
         console.print_exception()
         raise typer.Exit(code=1)
+
 
 if __name__ == "__main__":
     main()
